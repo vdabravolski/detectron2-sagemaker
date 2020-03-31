@@ -18,7 +18,11 @@ ENV FORCE_CUDA="1"
 # This will build detectron2 for all common cuda architectures and take a lot more time,
 # because inside `docker build`, there is no way to tell which architecture will be used.
 ENV TORCH_CUDA_ARCH_LIST="Kepler;Kepler+Tesla;Maxwell;Maxwell+Tegra;Pascal;Volta;Turing"
-RUN pip install --user -e /opt/program/detectron2
+# RUN pip install --user -e /opt/program/detectron2 - this is to compile detectron2 from sources. Takes a lot of time. TODO: switch back to compiling detectron2 from scratch.
+# Below is installing precompiled detectron2
+RUN python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu101/index.html
+
+RUN echo "pass detectron2 install"
 
 # Set a fixed model cache directory.
 ENV FVCORE_CACHE="/tmp"
