@@ -30,6 +30,6 @@ RUN pip install --user -e /opt/ml/code/detectron2
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
-ENV DETECTRON2_DATASETS="/opt/ml/data/training"
+ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
 ENV SAGEMAKER_PROGRAM train
 WORKDIR /
