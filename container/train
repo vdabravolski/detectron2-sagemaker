@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env bash
 
 # a placeholder for training script which will be called by Sagemaker at training time
 
-print("sample output")
+cd /opt/ml/code/detectron2/tools
+python ./train_net.py --num-gpus 1 --config-file ../configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml
