@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+# a placeholder for training script which will be called by Sagemaker at training time
+
+print("sample output")
