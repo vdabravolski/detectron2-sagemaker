@@ -5,8 +5,7 @@
 git+https://github.com/facebookresearch/detectron2.git
 
 # Following are not satisfied by standard PyTorch container: PyCoco 
--e git+https://github.com/philferriere/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
-
+#-e git+https://github.com/cocodataset/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
 
 ######Note:
 # Sagemaker PyTorch container has cusomer versions of torch and torchvision: https://github.com/aws/sagemaker-pytorch-container/blob/master/docker/1.4.0/py3/Dockerfile.gpu

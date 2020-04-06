@@ -7,12 +7,22 @@ import numpy as np
 import cv2
 import random
 
+import subprocess
+import sys
+    
+# install pycocotools
+subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI"])
+    
+print("user msg: list of all installed modules")
+print(sys.modules)
+    
 # import some common detectron2 utilities
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
+from detectron2.engine import DefaultTrainer
 
 
 # packages neededs for custom dataset
@@ -21,7 +31,7 @@ import numpy as np
 import json
 from detectron2.structures import BoxMode
 from detectron2.data import DatasetCatalog
-
+    
 
 def train():
     cfg = get_cfg()
@@ -42,14 +52,9 @@ def train():
     trainer.train()
 
 def prepare_dataset():
-    # location of the dataset "/opt/ml/input/data/training" & /opt/ml/input/data/validation
-    # sagemaker-us-east-2-553020858742/balloon/train and sagemaker-us-east-2-553020858742/balloon/val
-    # os.environ['SM_CHANNELS'] & SM_CHANNEL_TRAINING='/opt/ml/input/data/training' & SM_CHANNEL_TESTING='/opt/ml/input/data/testing'
-    
-    for d in ["train", "val"]: # TODO: register validation dataset as well. 
-        DatasetCatalog.register("balloon_" + d, lambda d=d: get_balloon_dicts(os.environ[f"SM_CHANNELS_{d}"]))
+    for d in ["train", "val"]:
+        DatasetCatalog.register("balloon_" + d, lambda d=d: get_balloon_dicts(os.environ[f"SM_CHANNEL_{d.upper()}"]))
         MetadataCatalog.get("balloon_" + d).set(thing_classes=["balloon"])
-    # return balloon_metadata = MetadataCatalog.get("balloon_train")
 
 
 def get_balloon_dicts(img_dir):
@@ -95,5 +100,6 @@ def get_balloon_dicts(img_dir):
 
 
 if __name__ == "__main__":
+    
     prepare_dataset()
     train()
