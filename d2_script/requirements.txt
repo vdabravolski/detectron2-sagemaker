@@ -1,11 +1,10 @@
 # Minimal requirements for D2 from here: https://colab.research.google.com/drive/16jcaJoc6bCFAQ96jDe2HwtXj7BMD_-m5#forceEdit=true&sandboxMode=true&scrollTo=wlqXIXXhW8dA
 # torch==1.4+cu100 torchvision==0.5+cu100 cython pyyaml==5.1 cocoapi detectron2
 
-# install d2 from FB page
+# install d2 from sources
 git+https://github.com/facebookresearch/detectron2.git
 
-# Following are not satisfied by standard PyTorch container:
-# PyCoco 
+# Following are not satisfied by standard PyTorch container: PyCoco 
 -e git+https://github.com/philferriere/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI
 
 
