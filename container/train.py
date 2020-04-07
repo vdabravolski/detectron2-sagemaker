@@ -31,7 +31,7 @@ logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
     
 
-def train():
+def train(*args):
 
     prepare_dataset()
 
@@ -42,7 +42,7 @@ def train():
     cfg.DATASETS.TEST = ()
     cfg.DATALOADER.NUM_WORKERS = 2 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")  # Let training initialize from model zoo
-    cfg.SOLVER.IMS_PER_BATCH = 2 # number ims_per_batch should be divisible by number of workers. Need to some sort of the check. https://github.com/facebookresearch/detectron2/blob/b8f4eebeb06827d49e31738c0997f919dac26aba/detectron2/data/build.py#L280
+    cfg.SOLVER.IMS_PER_BATCH = args[0] # number ims_per_batch should be divisible by number of workers. D2 assertion.
     cfg.SOLVER.BASE_LR = 0.00025  # pick a good LR
     cfg.SOLVER.MAX_ITER = 300    # 300 iterations seems good enough for this toy dataset; you may need to train longer for a practical dataset
     cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128   # faster, and good enough for this toy dataset (default: 512)
@@ -138,5 +138,5 @@ if __name__ == "__main__":
         num_machines=number_of_machines,
         machine_rank=machine_rank,
         dist_url=f"tcp://{master_addr}:{master_port}",
-        args=(),
+        args=(world_size,),
     )
