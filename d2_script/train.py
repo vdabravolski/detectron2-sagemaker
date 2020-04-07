@@ -10,9 +10,6 @@ import random
 import subprocess
 import sys
     
-# install pycocotools
-subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI"])
-    
 # import some common detectron2 utilities
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
