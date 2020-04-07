@@ -10,20 +10,13 @@ import random
 import subprocess
 import sys
     
-# install pycocotools
-subprocess.check_call([sys.executable, "-m", "pip", "install","--upgrade" ,"numpy"])
-subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI"])
-#subprocess.check_call([sys.executable, "-m", "pip", "install", "--force-reinstall", "torch"]) # TODO: try to install open-source version of pytorch/torch vision
-#subprocess.check_call([sys.executable, "-m", "pip", "install", "--force-reinstall","torchvision"]) # TODO: try to install open-source version of pytorch/torch vision
-    
 # import some common detectron2 utilities
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
-from detectron2.engine import DefaultTrainer
-
+from detectron2.engine import DefaultTrainer, launch
 
 # packages neededs for custom dataset
 import os
@@ -34,6 +27,10 @@ from detectron2.data import DatasetCatalog
     
 
 def train():
+
+    prepare_dataset()
+
+    # D2 configuration
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
     cfg.DATASETS.TRAIN = ("balloon_train",)
@@ -100,6 +97,42 @@ def get_balloon_dicts(img_dir):
 
 
 if __name__ == "__main__":
+    # Sagemaker configuration
+    print('Starting training...')
+    parser = argparse.ArgumentParser()
     
-    prepare_dataset()
-    train()
+    parser.add_argument('--backend', type=str, default="nccl", help='backend for distributed operations.') # TODO: it looks like we are not passing backend. 
+                                                                                                           # D2 defaults it to NCCL
+    parser.add_argument('--hosts', type=list, default=json.loads(os.environ["SM_HOSTS"]))
+    parser.add_argument('--current-host', type=str, default=os.environ["SM_CURRENT_HOST"])
+    parser.add_argument('--model-dir', type=str, default=os.environ["SM_MODEL_DIR"])
+    parser.add_argument('--num-gpus', type=int, default=os.environ["SM_NUM_GPUS"])
+    parser.add_argument('--num-cpus', type=int, default=os.environ["SM_NUM_CPUS"])
+    args = parser.parse_args()
+
+    number_of_processes = args.num_gpus if args.num_gpus > 0 else args.num_cpus
+    number_of_machines = len(args.hosts)
+    world_size = number_of_processes * number_of_machines
+    logger.info('Running \'{}\' backend on {} nodes and {} processes. World size is {}.'.format(
+        args.backend, number_of_machines, number_of_processes, world_size
+    ))
+    machine_rank = args.hosts.index(args.current_host)
+    master_addr = args.hosts[0]
+    master_port = '55555'
+    processes = [] # TODO: do we need it?
+    
+    #TODO: delete debug section
+    print(f"machine_rank:{machine_rank}")
+    print(f"master_addr:{master_addr}")
+    print(f"master_port:{master_port}")
+    print(f"num_gpus:{num_gpus}")
+    
+    # Launch D2 distributed training
+    launch(
+        train,
+        args.num_gpus,
+        num_machines=number_of_machines,
+        machine_rank=machine_rank,
+        dist_url=f"tcp://{master_addr}:{master_port}",
+        args=(args,),
+    )
