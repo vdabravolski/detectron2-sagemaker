@@ -5,6 +5,12 @@
 FROM 763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-training:1.4.0-gpu-py36-cu101-ubuntu16.04
 LABEL author="vadimd@amazon.com"
 
+############# Installing latest builds ############
+
+# This is to fix issue: https://github.com/pytorch/vision/issues/1489
+# TODO: test if this works, otherwise, fall back to preinstalled torch/torchvision in SM container
+RUN pip install --upgrade --force-reinstall torch torchvision
+
 ############# D2 section ##############
 
 # installing dependecies for detectron2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
@@ -21,7 +27,6 @@ ENV TORCH_CUDA_ARCH_LIST="Kepler;Kepler+Tesla;Maxwell;Maxwell+Tegra;Pascal;Volta
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
 ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
-
 
 ############# SageMaker section ##############
 
