@@ -1,22 +1,21 @@
-import detectron2
-from detectron2.utils.logger import setup_logger
-setup_logger()
-
 # import some common libraries
 import numpy as np
 import cv2
 import random
-
+import argparse
 import subprocess
 import sys
+import logging
     
 # import some common detectron2 utilities
+import detectron2
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
 from detectron2.engine import DefaultTrainer, launch
+from detectron2.utils.logger import setup_logger
 
 # packages neededs for custom dataset
 import os
@@ -24,6 +23,12 @@ import numpy as np
 import json
 from detectron2.structures import BoxMode
 from detectron2.data import DatasetCatalog
+
+# Logging TODO: remove duplicative loggers
+setup_logger() # D2 logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler(sys.stdout))
     
 
 def train():
