@@ -9,20 +9,20 @@ LABEL author="vadimd@amazon.com"
 
 # This is to fix issue: https://github.com/pytorch/vision/issues/1489
 # TODO: test if this works, otherwise, fall back to preinstalled torch/torchvision in SM container
-RUN pip install --upgrade --force-reinstall torch torchvision
+RUN pip install --upgrade --force-reinstall torch torchvision cython
 
 ############# D2 section ##############
 
-# installing dependecies for detectron2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
+# installing dependecies for D2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
 RUN pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
 RUN pip install 'git+https://github.com/facebookresearch/fvcore'
+
+ENV FORCE_CUDA="1"
+# Build D2 only for Volta architecture - V100 chips (ml.p3 AWS instances)
+ENV TORCH_CUDA_ARCH_LIST="Volta" 
+
 # Build D2 from latest sources
 RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
-ENV FORCE_CUDA="1"
-
-# This will build detectron2 for all common cuda architectures and take a lot more time,
-# because inside `docker build`, there is no way to tell which architecture will be used.
-ENV TORCH_CUDA_ARCH_LIST="Kepler;Kepler+Tesla;Maxwell;Maxwell+Tegra;Pascal;Volta;Turing"
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
