@@ -41,5 +41,5 @@ ENV SAGEMAKER_PROGRAM train_coco.py
 
 WORKDIR /
 
-# Starts framework distributed framework
+# Starts PyTorch distributed framework
 ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
