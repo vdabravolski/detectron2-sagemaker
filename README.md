@@ -1,8 +1,8 @@
 # Goals
 This repository implements port of latest [Detectron2](https://github.com/facebookresearch/detectron2/) ("D2") to [Amazon Sagemaker](https://aws.amazon.com/sagemaker/). Scope includes:
-- [checkbox:checked] training of D2 on custom small balloon dataset using Sagemaker distributed training;
-- [checkbox:unchecked] training of D2 on COCO2017 using Sagemaker distributed training;
-- [checkbox:unchecked] deploying trained D2 model on Sagemaker Inference endpoint.
+- [x] training of D2 on custom small balloon dataset using Sagemaker distributed training;
+- [ ] training of D2 on COCO2017 using Sagemaker distributed training;
+- [ ] deploying trained D2 model on Sagemaker Inference endpoint.
 
 
 ## Training on Balloon dataset.
