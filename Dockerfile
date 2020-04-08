@@ -8,7 +8,6 @@ LABEL author="vadimd@amazon.com"
 ############# Installing latest builds ############
 
 # This is to fix issue: https://github.com/pytorch/vision/issues/1489
-# TODO: test if this works, otherwise, fall back to preinstalled torch/torchvision in SM container
 RUN pip install --upgrade --force-reinstall torch torchvision cython
 
 ############# D2 section ##############
