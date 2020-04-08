@@ -31,9 +31,6 @@ wget -O $STAGE_DIR/annotations_trainval2017.zip http://images.cocodataset.org/an
 unzip -o $STAGE_DIR/annotations_trainval2017.zip -d $STAGE_DIR
 rm $STAGE_DIR/annotations_trainval2017.zip
 
-mkdir $STAGE_DIR/pretrained-models
-wget -O $STAGE_DIR/pretrained-models/ImageNet-R50-AlignPadding.npz http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz
-
 echo "`date`: Uploading extracted files to s3://$S3_BUCKET/$S3_PREFIX [ eta 12 minutes ]"
 aws s3 cp --recursive $STAGE_DIR s3://$S3_BUCKET/$S3_PREFIX | awk 'BEGIN {ORS="="} {if(NR%100==0)print "="}'
 echo "Done."
