@@ -10,10 +10,12 @@ import logging
 import os
 from collections import OrderedDict
 import torch
+import json
     
 # import some common detectron2 utilities
 # TODO: check imports and remove redundant
 import detectron2.utils.comm as comm
+from detectron2 import model_zoo
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.data import MetadataCatalog
@@ -30,12 +32,11 @@ from detectron2.evaluation import (
 )
 from detectron2.modeling import GeneralizedRCNNWithTTA
 
-# Logging TODO: remove duplicative loggers
+from detectron2.utils.logger import setup_logger
 setup_logger() # D2 logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
-    
 
 class Trainer(DefaultTrainer):
     """
@@ -108,7 +109,10 @@ class Trainer(DefaultTrainer):
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
 
-def main(cfg, args):
+def main(*params):
+    
+    cfg = params[0]
+    args = params[1]
     
     if args.eval_only:
         model = Trainer.build_model(cfg)
@@ -141,19 +145,15 @@ def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, ma
     Returns:
         argparse.ArgumentParser:
     """
-    parser = argparse.ArgumentParser(description="Detectron2 Training")
-    parser.add_argument("--config-file", default="../configs/"+config_file, metavar="FILE", help="path to config file")
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="whether to attempt to resume from the checkpoint directory",
-    )
+    parser = argparse.ArgumentParser(description="Detectron2 Training")    
+    parser.add_argument("--config-file", default=config_file, metavar="FILE", help="path to config file")
+    parser.add_argument("--resume", action="store_true",help="whether to attempt to resume from the checkpoint directory",)
     parser.add_argument("--eval-only", action="store_true", help="perform evaluation only")
     parser.add_argument("--num-gpus", type=int, default=num_gpus, help="number of gpus *per machine*")
     parser.add_argument("--num-machines", type=int, default=num_machines)
     parser.add_argument("--machine-rank", type=int, default=machine_rank, help="the rank of this machine (unique per machine)")
 
-    # port = 2 ** 15 + 2 ** 14 + hash(os.getuid() if sys.platform != "win32" else 1) % 2 ** 14 # override D2 port allocation with predefined Sagemaker distributed cluster params
+    # port = 2 ** 15 + 2 ** 14 + hash(os.getuid() if sys.platform != "win32" else 1) % 2 ** 14 # replace D2 port allocation with predefined Sagemaker distributed cluster params
     parser.add_argument("--dist-url", default="tcp://{}:{}".format(master_addr, master_port))
     parser.add_argument(
         "opts",
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument('--model-dir', type=str, default=os.environ["SM_MODEL_DIR"])
     parser.add_argument('--num-gpus', type=int, default=os.environ["SM_NUM_GPUS"])
     parser.add_argument('--num-cpus', type=int, default=os.environ["SM_NUM_CPUS"])
-    parser.add_argument('--config-file', default="", metavar="FILE", help="path to config file")
+    parser.add_argument('--config-file', default="COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml", metavar="FILE", help="path to config file")
     sm_args = parser.parse_args()
     
     # Derive parameters of distributed training
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     number_of_machines = len(sm_args.hosts)
     world_size = number_of_processes * number_of_machines
     logger.info('Running \'{}\' backend on {} nodes and {} processes. World size is {}.'.
-                format(args.backend, number_of_machines, number_of_processes, world_size))
+                format(sm_args.backend, number_of_machines, number_of_processes, world_size))
     machine_rank = sm_args.hosts.index(sm_args.current_host)
     master_addr = sm_args.hosts[0]
     master_port = '55555'
@@ -194,7 +194,11 @@ if __name__ == "__main__":
     # TODO: Training call - configs are designed for 8 gpus, so may need to troubleshoot
     # ./train_net.py --num-gpus 8 --config-file ../configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml
     
-    d2_args = custom_argument_parser(sm_args.config_file, sm_args.num_gpus, number_of_machines, machine_rank, master_addr,master_port).parse_args() # should this be just empty object???
+    #D2 expects ArgParser object to configure Trainer. As distributed config is derived from Sagemaker job, we are constructing artificial ArgParse object here. TODO: fix it.
+    config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
+    print(config_file_path)
+    d2_args = custom_argument_parser(config_file_path, sm_args.num_gpus,
+                                     number_of_machines, machine_rank, master_addr,master_port).parse_args() 
     # TODO: need to update some arguments from here: https://github.com/facebookresearch/detectron2/blob/cd9ac61861e83856ed8854c98ebaf383b77950ae/detectron2/engine/defaults.py#L49
     
     # implements this logic https://github.com/facebookresearch/detectron2/blob/master/tools/train_net.py#L114-L123
@@ -213,9 +217,9 @@ if __name__ == "__main__":
     # Launch D2 distributed training
     launch(
         main,
-        args.num_gpus,
+        sm_args.num_gpus,
         num_machines=number_of_machines,
         machine_rank=machine_rank,
         dist_url=f"tcp://{master_addr}:{master_port}",
-        args=(cfg, d2_args),
+        args=(cfg, d2_args,),
     )
