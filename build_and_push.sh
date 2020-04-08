@@ -13,8 +13,8 @@ then
     exit 1
 fi
 
-chmod +x container/train
-chmod +x container/serve
+chmod +x container_training/train_balloon.py
+chmod +x container_training/train_coco.py
 
 # Get the account number associated with the current IAM credentials
 account=$(aws sts get-caller-identity --query Account --output text)

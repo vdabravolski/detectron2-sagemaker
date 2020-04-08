@@ -30,11 +30,11 @@ ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
 
 ############# SageMaker section ##############
 
-COPY container /opt/ml/code
+COPY container_training /opt/ml/code
 WORKDIR /opt/ml/code
 
 ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
-ENV SAGEMAKER_PROGRAM train.py
+ENV SAGEMAKER_PROGRAM train_balloon.py
 
 WORKDIR /
 
