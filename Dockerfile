@@ -26,6 +26,7 @@ RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
+# set location of training datasetm, Sagemaker containers copy all data from S3 to /opt/ml/input/data/{channels}
 ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
 
 ############# SageMaker section ##############
@@ -34,7 +35,7 @@ COPY container_training /opt/ml/code
 WORKDIR /opt/ml/code
 
 ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
-ENV SAGEMAKER_PROGRAM train_balloon.py
+ENV SAGEMAKER_PROGRAM train_coco.py
 
 WORKDIR /
 
