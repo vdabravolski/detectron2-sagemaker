@@ -34,6 +34,9 @@ ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
 COPY container_training /opt/ml/code
 WORKDIR /opt/ml/code
 
+# cloning D2 to code dir as we need access to default congigs
+RUN git clone 'https://github.com/facebookresearch/detectron2.git'
+
 ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
 ENV SAGEMAKER_PROGRAM train_coco.py
 
