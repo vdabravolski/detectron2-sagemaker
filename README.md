@@ -7,7 +7,7 @@ This repository implements port of latest [Detectron2](https://github.com/facebo
 
 ## Training on Balloon dataset.
 This is a toy example based on [D2 tutorial](https://colab.research.google.com/drive/16jcaJoc6bCFAQ96jDe2HwtXj7BMD_-m5#scrollTo=UkNbUzUOLYf0). To run training do following:
-- update container/Dockerfile with `ENV SAGEMAKER_PROGRAM train_balloon.py`;
+- update `container_training/Dockerfile` with `ENV SAGEMAKER_PROGRAM train_balloon.py`;
 - execute `build_and_push.sh <image name>` to build a new customer Sagemaker-compatible container;
 - open notebook `d2_byo_container_balloon_training.ipynb` and execute cells one by one.
 
