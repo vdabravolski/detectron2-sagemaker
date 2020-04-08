@@ -16,6 +16,8 @@ fi
 chmod +x container_training/train_balloon.py
 chmod +x container_training/train_coco.py
 
+rm -r container_training/detectron2
+
 # Get the account number associated with the current IAM credentials
 account=$(aws sts get-caller-identity --query Account --output text)
 
