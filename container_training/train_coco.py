@@ -143,7 +143,7 @@ def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, ma
     """
     Create a parser with some common arguments used by detectron2 users.
     Returns:
-        argparse.ArgumentParser:
+        argparse.NameSpace:
     """
     parser = argparse.ArgumentParser(description="Detectron2 Training")    
     parser.add_argument("--config-file", default=config_file, metavar="FILE", help="path to config file")
@@ -152,17 +152,24 @@ def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, ma
     parser.add_argument("--num-gpus", type=int, default=num_gpus, help="number of gpus *per machine*")
     parser.add_argument("--num-machines", type=int, default=num_machines)
     parser.add_argument("--machine-rank", type=int, default=machine_rank, help="the rank of this machine (unique per machine)")
-
-    # port = 2 ** 15 + 2 ** 14 + hash(os.getuid() if sys.platform != "win32" else 1) % 2 ** 14 # replace D2 port allocation with predefined Sagemaker distributed cluster params
     parser.add_argument("--dist-url", default="tcp://{}:{}".format(master_addr, master_port))
     parser.add_argument(
-        "opts",
+        "--opts",
         help="Modify config options using the command-line",
         default=None,
         nargs=argparse.REMAINDER,
-    )
+    )    
     return parser
 
+def opts_to_list(opts):
+    """
+    This function takes a string and converts it to list of string params (YACS expected format). 
+    E.g.:
+        ['SOLVER.IMS_PER_BATCH 2 SOLVER.BASE_LR 0.9999'] -> ['SOLVER.IMS_PER_BATCH', '2', 'SOLVER.BASE_LR', '0.9999']
+    """
+    import re
+    list_opts = re.split('\s+', d2_args.opts[0])
+    return list_opts
 
 
 if __name__ == "__main__":
@@ -177,6 +184,7 @@ if __name__ == "__main__":
     parser.add_argument('--num-gpus', type=int, default=os.environ["SM_NUM_GPUS"])
     parser.add_argument('--num-cpus', type=int, default=os.environ["SM_NUM_CPUS"])
     parser.add_argument('--config-file', default="COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml", metavar="FILE", help="path to config file")
+    parser.add_argument('--opts', default=None, help="Detectron2 training config params")
     sm_args = parser.parse_args()
     
     # Derive parameters of distributed training
@@ -189,26 +197,21 @@ if __name__ == "__main__":
     master_addr = sm_args.hosts[0]
     master_port = '55555'
     
-    # D2 configuration
-    # See for details: https://detectron2.readthedocs.io/modules/config.html#config-references
-    # TODO: Training call - configs are designed for 8 gpus, so may need to troubleshoot
-    # ./train_net.py --num-gpus 8 --config-file ../configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml
-    
-    #D2 expects ArgParser object to configure Trainer. As distributed config is derived from Sagemaker job, we are constructing artificial ArgParse object here. TODO: fix it.
+    # D2 configuration    
+    # D2 expects ArgParser.NameSpace object to configure Trainer. As distributed training config is derived from Sagemaker job parameters and not command line args, 
+    # we are constructing artificial ArgParse object here. TODO: consider refactoring it in future.
     config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
-    print(config_file_path)
     d2_args = custom_argument_parser(config_file_path, sm_args.num_gpus,
                                      number_of_machines, machine_rank, master_addr,master_port).parse_args() 
-    # TODO: need to update some arguments from here: https://github.com/facebookresearch/detectron2/blob/cd9ac61861e83856ed8854c98ebaf383b77950ae/detectron2/engine/defaults.py#L49
-    
-    # implements this logic https://github.com/facebookresearch/detectron2/blob/master/tools/train_net.py#L114-L123
+
     cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file(sm_args.config_file))
-    cfg.DATALOADER.NUM_WORKERS = 2 
+    cfg.merge_from_file(model_zoo.get_config_file(sm_args.config_file)) # get baseline parameters from YAML config
+    list_opts = opts_to_list(d2_args.opts) # convert training hyperparameters from SM format to D2
+    cfg.merge_from_list(list_opts) # override defaults params from D2 config_file with user defined hyperparameters
+
+    # Parameters below are hardcoded as they are specific to Sagemaker environment, no configuration needed.
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo
     cfg.SOLVER.IMS_PER_BATCH = world_size # number ims_per_batch should be divisible by number of workers. D2 assertion.
-    cfg.SOLVER.BASE_LR = 0.00025  # TODO: check good LR, not clear how LR will depend on number of hosts/GPUs
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 80  # TODO: need to confirm that this is correct # of classes for COCO2017
     cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR'] # TODO check that this config works fine
     cfg.freeze()
     
