@@ -139,27 +139,26 @@ def main(*params):
     return trainer.train()
 
 
-def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, master_addr,master_port):
+def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, master_addr,master_port, opts):
     """
-    Create a parser with some common arguments used by detectron2 users.
+    Create a parser with some common arguments for Detectron2 training script.
     Returns:
         argparse.NameSpace:
     """
-    parser = argparse.ArgumentParser(description="Detectron2 Training")    
-    parser.add_argument("--config-file", default=config_file, metavar="FILE", help="path to config file")
+    parser = argparse.ArgumentParser(description="Detectron2 Training")
+    parser.add_argument("--config-file", default=None, metavar="FILE", help="path to config file")
+    parser.add_argument("--num-gpus", type=int, default=None, help="number of gpus *per machine*")
+    parser.add_argument("--opts",default=None ,help="Modify config options using the command-line")
     parser.add_argument("--resume", action="store_true",help="whether to attempt to resume from the checkpoint directory",)
     parser.add_argument("--eval-only", action="store_true", help="perform evaluation only")
-    parser.add_argument("--num-gpus", type=int, default=num_gpus, help="number of gpus *per machine*")
-    parser.add_argument("--num-machines", type=int, default=num_machines)
-    parser.add_argument("--machine-rank", type=int, default=machine_rank, help="the rank of this machine (unique per machine)")
-    parser.add_argument("--dist-url", default="tcp://{}:{}".format(master_addr, master_port))
-    parser.add_argument(
-        "--opts",
-        help="Modify config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )    
-    return parser
+    
+    # TODO: resume and eval_only are not properly passed right now
+    args = parser.parse_args(["--config-file", config_file,
+                             "--num-gpus", str(num_gpus),
+#                             "--resume",
+#                             "--eval-only",
+                             "--opts", opts])
+    return args
 
 def opts_to_list(opts):
     """
@@ -168,7 +167,7 @@ def opts_to_list(opts):
         ['SOLVER.IMS_PER_BATCH 2 SOLVER.BASE_LR 0.9999'] -> ['SOLVER.IMS_PER_BATCH', '2', 'SOLVER.BASE_LR', '0.9999']
     """
     import re
-    list_opts = re.split('\s+', d2_args.opts[0])
+    list_opts = re.split('\s+', opts)
     return list_opts
 
 
@@ -202,7 +201,7 @@ if __name__ == "__main__":
     # we are constructing artificial ArgParse object here. TODO: consider refactoring it in future.
     config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
     d2_args = custom_argument_parser(config_file_path, sm_args.num_gpus,
-                                     number_of_machines, machine_rank, master_addr,master_port).parse_args() 
+                                     number_of_machines, machine_rank, master_addr,master_port, sm_args.opts)
 
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(sm_args.config_file)) # get baseline parameters from YAML config
