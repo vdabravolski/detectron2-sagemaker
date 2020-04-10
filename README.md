@@ -6,6 +6,11 @@ This repository implements port of latest [Detectron2](https://github.com/facebo
 - [ ] training of D2 on COCO2017 using Sagemaker distributed training;
 - [ ] deploying trained D2 model on Sagemaker Inference endpoint.
 
+## Containers
+Amazon Sagemaker uses docker containers both for training and inference. For Detectron2 it's planned to create two separate containers for training and serving.
+
+**Note**: by default training container compiles Detectron2 for Volta architecture (Tesla V100 GPUs). If you'd like to run training on other GPU architectures, consider updating this [environment variable](https://github.com/vdabravolski/detectron2-sagemaker/blob/e6252211b819815962207d1a61d5675d213e0f25/Dockerfile#L21). Here is an example on how to compile Detectron2 for all supported architectures:
+`ENV TORCH_CUDA_ARCH_LIST="Kepler;Kepler+Tesla;Maxwell;Maxwell+Tegra;Pascal;Volta;Turing"`
 
 ## Training on Balloon dataset.
 This is a toy example based on [D2 tutorial](https://colab.research.google.com/drive/16jcaJoc6bCFAQ96jDe2HwtXj7BMD_-m5#scrollTo=UkNbUzUOLYf0). To run training do following:
