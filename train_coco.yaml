@@ -13,17 +13,17 @@ spec:
         trainingInputMode: File
         metricDefinitions:
         - name: "total_loss"
-          regex: ".*total_loss:/\/s([0-9\\.]+)/\/s*"
+          regex: ".*total_loss:\\s([0-9\\.]+)\\s*"
         - name: "loss_cls"
-          regex: ".*loss_cls:/\/s([0-9\\.]+)/\/s*"
+          regex: ".*loss_cls:\\s([0-9\\.]+)\\s*"
         - name: "loss_box_reg"
-          regex: ".*loss_box_reg:/\/s([0-9\\.]+)/\/s*"
+          regex: ".*loss_box_reg:\\s([0-9\\.]+)\\s*"
         - name: "loss_mask"
-          regex: ".*loss_mask:/\/s([0-9\\.]+)/\/s*"
+          regex: ".*loss_mask:\\s([0-9\\.]+)\\s*"
         - name: "loss_rpn_cls"
-          regex: ".*loss_rpn_cls:/\/s([0-9\\.]+)/\/s*"          
+          regex: ".*loss_rpn_cls:\\s([0-9\\.]+)\\s*"          
         - name: "loss_rpn_loc"
-          regex: ".*loss_rpn_loc:/\/s([0-9\\.]+)/\/s*"       
+          regex: ".*loss_rpn_loc:\\s([0-9\\.]+)\\s*"       
     roleArn: <Sagemaker Role ARN> # add your Sagemaker execution role
     region: <AWS Region> # add your region
     outputDataConfig:
