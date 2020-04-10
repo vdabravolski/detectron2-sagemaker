@@ -5,25 +5,25 @@ metadata:
 spec:
     hyperParameters:
         - name: config-file
-        value: "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
+          value: "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
         - name: opts
-        value: "SOLVER.BASE_LR 0.00025 MODEL.ROI_HEADS.NUM_CLASSES 80 DATALOADER.NUM_WORKERS 2"
+          value: "SOLVER.BASE_LR 0.00025 MODEL.ROI_HEADS.NUM_CLASSES 80 DATALOADER.NUM_WORKERS 2"
     algorithmSpecification:
         trainingImage: <AWS account>.dkr.ecr.<AWS region>.amazonaws.com/<your_container_name> # add your image URI
         trainingInputMode: File
         metricDefinitions:
         - name: "total_loss"
-          regex: ".*total_loss:\s([0-9\\.]+)\s*"
+          regex: ".*total_loss:/\/s([0-9\\.]+)/\/s*"
         - name: "loss_cls"
-          regex: ".*loss_cls:\s([0-9\\.]+)\s*"
+          regex: ".*loss_cls:/\/s([0-9\\.]+)/\/s*"
         - name: "loss_box_reg"
-          regex: ".*loss_box_reg:\s([0-9\\.]+)\s*"
+          regex: ".*loss_box_reg:/\/s([0-9\\.]+)/\/s*"
         - name: "loss_mask"
-          regex: ".*loss_mask:\s([0-9\\.]+)\s*"
+          regex: ".*loss_mask:/\/s([0-9\\.]+)/\/s*"
         - name: "loss_rpn_cls"
-          regex: ".*loss_rpn_cls:\s([0-9\\.]+)\s*"          
+          regex: ".*loss_rpn_cls:/\/s([0-9\\.]+)/\/s*"          
         - name: "loss_rpn_loc"
-          regex: ".*loss_rpn_loc:\s([0-9\\.]+)\s*"       
+          regex: ".*loss_rpn_loc:/\/s([0-9\\.]+)/\/s*"       
     roleArn: <Sagemaker Role ARN> # add your Sagemaker execution role
     region: <AWS Region> # add your region
     outputDataConfig:
