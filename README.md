@@ -1,3 +1,5 @@
+This is not official AWS repository. Code provided "as is".
+
 # Goals
 This repository implements port of latest [Detectron2](https://github.com/facebookresearch/detectron2/) ("D2") to [Amazon Sagemaker](https://aws.amazon.com/sagemaker/). Scope includes:
 - [x] training of D2 on custom small balloon dataset using Sagemaker distributed training;
@@ -24,3 +26,4 @@ Work in progress
 
 
 
+<meta name="google-site-verification" content="TJ1O29NoipnKNI7NB9lQ5Wb2C58rvyM_rQZvPpz4zvg" />
