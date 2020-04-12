@@ -27,9 +27,12 @@ Work in progress. Instructions below are subject to change. To run first version
 - open notebook `d2_byo_container_coco2017_training.ipynb` and execute cells one by one.
 
 ## Deploying trained D2 model for inference.
-Work in progress
+**Work in progress**: As of April'2020, Detectron2 supports model export to [Caffe2 format](https://detectron2.readthedocs.io/tutorials/deployment.html#caffe2-deployment) (via ONNX) for serving. The intention is to deploy D2 models for serving as [Amazon Elastic Inference](https://aws.amazon.com/machine-learning/elastic-inference/) ("EI") for cost efficiencies, and currently EI only support PyTorch, MxNet, and Tensorflow runtime environment. Hence, following options will be considered:
+- Create custom container for Caffe2 serving in Sagemaker;
+- Convert D2 model to ONXX. However, D2 has some [custom ops](https://github.com/facebookresearch/detectron2/blob/2ca36e3cbfb2c84c18502221564b629f3877e8be/detectron2/export/api.py#L63-L66) not supported by other runtimes. Will likely need to customize it further.
 
 
 
 
-<meta name="google-site-verification" content="TJ1O29NoipnKNI7NB9lQ5Wb2C58rvyM_rQZvPpz4zvg" />
+
+
