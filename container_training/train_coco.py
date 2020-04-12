@@ -139,7 +139,7 @@ def main(*params):
     return trainer.train()
 
 
-def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, master_addr,master_port, opts):
+def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, master_addr,master_port, opts, resume, eval_only):
     """
     Create a parser with some common arguments for Detectron2 training script.
     Returns:
@@ -149,14 +149,14 @@ def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, ma
     parser.add_argument("--config-file", default=None, metavar="FILE", help="path to config file")
     parser.add_argument("--num-gpus", type=int, default=None, help="number of gpus *per machine*")
     parser.add_argument("--opts",default=None ,help="Modify config options using the command-line")
-    parser.add_argument("--resume", action="store_true",help="whether to attempt to resume from the checkpoint directory",)
-    parser.add_argument("--eval-only", action="store_true", help="perform evaluation only")
+    parser.add_argument("--resume", type=bool, default=False, help="whether to attempt to resume from the checkpoint directory",)
+    parser.add_argument("--eval-only", type=bool, default=False, help="perform evaluation only")
     
     # TODO: resume and eval_only are not properly passed right now
     args = parser.parse_args(["--config-file", config_file,
                              "--num-gpus", str(num_gpus),
-#                             "--resume",
-#                             "--eval-only",
+                             "--resume", str(resume),
+                             "--eval-only", str(eval_only),
                              "--opts", opts])
     return args
 
@@ -182,8 +182,10 @@ if __name__ == "__main__":
     parser.add_argument('--model-dir', type=str, default=os.environ["SM_MODEL_DIR"])
     parser.add_argument('--num-gpus', type=int, default=os.environ["SM_NUM_GPUS"])
     parser.add_argument('--num-cpus', type=int, default=os.environ["SM_NUM_CPUS"])
-    parser.add_argument('--config-file', default="COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml", metavar="FILE", help="path to config file")
-    parser.add_argument('--opts', default=None, help="Detectron2 training config params")
+    parser.add_argument('--config-file', default="", metavar="FILE")
+    parser.add_argument('--resume', type=bool, default=False)
+    parser.add_argument('--eval-only', type=bool, default=False)
+    parser.add_argument('--opts', default=None)
     sm_args = parser.parse_args()
     
     # Derive parameters of distributed training
@@ -201,7 +203,7 @@ if __name__ == "__main__":
     # we are constructing artificial ArgParse object here. TODO: consider refactoring it in future.
     config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
     d2_args = custom_argument_parser(config_file_path, sm_args.num_gpus,
-                                     number_of_machines, machine_rank, master_addr,master_port, sm_args.opts)
+                                     number_of_machines, machine_rank, master_addr,master_port, sm_args.opts, sm_args.resume, sm_args.eval_only)
 
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(sm_args.config_file)) # get baseline parameters from YAML config
