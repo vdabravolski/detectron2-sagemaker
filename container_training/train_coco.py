@@ -114,20 +114,18 @@ class Trainer(DefaultTrainer):
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
 
-def main(*params):
+def main(sm_args):
     
-    cfg = params[0]
-    args = params[1]
-    
-    # Converting string params to boolean flags
-    eval_only = True if args.eval_only=="True" else False
-    resume = True if args.resume=="True" else False
+    cfg = setup(sm_args)
+        
+    # Converting string params to boolean flags as Sagemaker doesn't support currently boolean flags as hyperparameters.
+    eval_only = True if sm_args.eval_only=="True" else False
+    resume = True if sm_args.resume=="True" else False
     
     if eval_only:
         model = Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
-            cfg.MODEL.WEIGHTS, resume=args.resume
-        )
+            cfg.MODEL.WEIGHTS, resume=resume)
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
@@ -147,8 +145,35 @@ def main(*params):
         )
     return trainer.train()
 
+def setup(sm_args):
+    """
+    Create D2 configs and perform basic setups.  
+    """
+    
+    # D2 expects ArgParser.NameSpace object to ammend Cfg node.
+    # We are constructing artificial ArgParse object here. TODO: consider refactoring it in future.
+    config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
+    d2_args = custom_argument_parser(config_file_path, sm_args.opts, sm_args.resume, sm_args.eval_only)
+    
+    cfg = get_cfg()
+    cfg.merge_from_file(config_file_path) # get baseline parameters from YAML config
+    list_opts = opts_to_list(sm_args.opts) # convert training hyperparameters from SM format to D2
+    cfg.merge_from_list(list_opts) # override defaults params from D2 config_file with user defined hyperparameters
 
-def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, master_addr,master_port, opts, resume, eval_only):
+    # Parameters below are hardcoded as they are specific to Sagemaker environment, no configuration needed.
+    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo. TODO: check how this works.
+    _, _ , world_size = get_sm_world_size(sm_args)
+    
+    cfg.SOLVER.IMS_PER_BATCH = world_size # number ims_per_batch should be divisible by number of workers. D2 assertion. TODO: currently equal to world_size
+    cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR']
+    cfg.freeze()
+    
+    default_setup(cfg, d2_args)
+    
+    return cfg
+    
+
+def custom_argument_parser(config_file, opts, resume, eval_only):
     """
     Create a parser with some common arguments for Detectron2 training script.
     Returns:
@@ -156,13 +181,11 @@ def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, ma
     """
     parser = argparse.ArgumentParser(description="Detectron2 Training")
     parser.add_argument("--config-file", default=None, metavar="FILE", help="path to config file")
-    parser.add_argument("--num-gpus", type=int, default=None, help="number of gpus *per machine*")
     parser.add_argument("--opts",default=None ,help="Modify config options using the command-line")
     parser.add_argument("--resume", type=str, default="True", help="whether to attempt to resume from the checkpoint directory",)
     parser.add_argument("--eval-only", type=str, default="False", help="perform evaluation only")
     
     args = parser.parse_args(["--config-file", config_file,
-                             "--num-gpus", str(num_gpus),
                              "--resume", resume,
                              "--eval-only", eval_only,
                              "--opts", opts])
@@ -178,6 +201,18 @@ def opts_to_list(opts):
     list_opts = re.split('\s+', opts)
     return list_opts
 
+
+def get_sm_world_size(sm_args):
+    """
+    Calculates number of devices in Sagemaker distributed cluster
+    """
+    
+    number_of_processes = sm_args.num_gpus if sm_args.num_gpus > 0 else sm_args.num_cpus
+    number_of_machines = len(sm_args.hosts)
+    world_size = number_of_processes * number_of_machines
+    
+    return number_of_processes, number_of_machines, world_size
+    
 
 if __name__ == "__main__":
     
@@ -197,35 +232,13 @@ if __name__ == "__main__":
     sm_args = parser.parse_args()
     
     # Derive parameters of distributed training
-    number_of_processes = sm_args.num_gpus if sm_args.num_gpus > 0 else sm_args.num_cpus
-    number_of_machines = len(sm_args.hosts)
-    world_size = number_of_processes * number_of_machines
+    number_of_processes, number_of_machines, world_size = get_sm_world_size(sm_args)
     logger.info('Running \'{}\' backend on {} nodes and {} processes. World size is {}.'.
                 format(sm_args.backend, number_of_machines, number_of_processes, world_size))
     machine_rank = sm_args.hosts.index(sm_args.current_host)
     master_addr = sm_args.hosts[0]
     master_port = '55555'
-    
-    # D2 configuration    
-    # D2 expects ArgParser.NameSpace object to configure Trainer. As distributed training config is derived from Sagemaker job parameters and not command line args, 
-    # we are constructing artificial ArgParse object here. TODO: consider refactoring it in future.
-    config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
-    d2_args = custom_argument_parser(config_file_path, sm_args.num_gpus,
-                                     number_of_machines, machine_rank, master_addr,master_port, sm_args.opts, sm_args.resume, sm_args.eval_only)
-
-    cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file(sm_args.config_file)) # get baseline parameters from YAML config
-    list_opts = opts_to_list(d2_args.opts) # convert training hyperparameters from SM format to D2
-    cfg.merge_from_list(list_opts) # override defaults params from D2 config_file with user defined hyperparameters
-
-    # Parameters below are hardcoded as they are specific to Sagemaker environment, no configuration needed.
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo
-    cfg.SOLVER.IMS_PER_BATCH = world_size # number ims_per_batch should be divisible by number of workers. D2 assertion.
-    cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR'] # TODO check that this config works fine
-    cfg.freeze()
-    
-    default_setup(cfg, d2_args)
-    
+        
     # Launch D2 distributed training
     launch(
         main,
@@ -233,5 +246,5 @@ if __name__ == "__main__":
         num_machines=number_of_machines,
         machine_rank=machine_rank,
         dist_url=f"tcp://{master_addr}:{master_port}",
-        args=(cfg, d2_args,),
+        args=(sm_args,),
     )
