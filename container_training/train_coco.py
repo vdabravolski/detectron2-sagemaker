@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """
 This is a re-implementation of Detectron2 sample training script: https://github.com/facebookresearch/detectron2/blob/master/tools/train_net.py
+
+TODO:
+ - remove intermediate checkpoints from model export (to reduce size of model package). It looks like easiest way is to clean up output dir after training.
+ - remove log.txt (as it's stored by Sagemaker anyway)
+
 """
 
 # import some common libraries
@@ -114,7 +119,11 @@ def main(*params):
     cfg = params[0]
     args = params[1]
     
-    if args.eval_only:
+    # Converting string params to boolean flags
+    eval_only = True if args.eval_only=="True" else False
+    resume = True if args.resume=="True" else False
+    
+    if eval_only:
         model = Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
@@ -131,7 +140,7 @@ def main(*params):
     consider writing your own training loop or subclassing the trainer.
     """
     trainer = Trainer(cfg)
-    trainer.resume_or_load(resume=args.resume)
+    trainer.resume_or_load(resume=resume)
     if cfg.TEST.AUG.ENABLED:
         trainer.register_hooks(
             [hooks.EvalHook(0, lambda: trainer.test_with_TTA(cfg, trainer.model))]
@@ -149,14 +158,13 @@ def custom_argument_parser(config_file, num_gpus, num_machines, machine_rank, ma
     parser.add_argument("--config-file", default=None, metavar="FILE", help="path to config file")
     parser.add_argument("--num-gpus", type=int, default=None, help="number of gpus *per machine*")
     parser.add_argument("--opts",default=None ,help="Modify config options using the command-line")
-    parser.add_argument("--resume", type=bool, default=False, help="whether to attempt to resume from the checkpoint directory",)
-    parser.add_argument("--eval-only", type=bool, default=False, help="perform evaluation only")
+    parser.add_argument("--resume", type=str, default="True", help="whether to attempt to resume from the checkpoint directory",)
+    parser.add_argument("--eval-only", type=str, default="False", help="perform evaluation only")
     
-    # TODO: resume and eval_only are not properly passed right now
     args = parser.parse_args(["--config-file", config_file,
                              "--num-gpus", str(num_gpus),
-                             "--resume", str(resume),
-                             "--eval-only", str(eval_only),
+                             "--resume", resume,
+                             "--eval-only", eval_only,
                              "--opts", opts])
     return args
 
@@ -183,8 +191,8 @@ if __name__ == "__main__":
     parser.add_argument('--num-gpus', type=int, default=os.environ["SM_NUM_GPUS"])
     parser.add_argument('--num-cpus', type=int, default=os.environ["SM_NUM_CPUS"])
     parser.add_argument('--config-file', default="", metavar="FILE")
-    parser.add_argument('--resume', type=bool, default=False)
-    parser.add_argument('--eval-only', type=bool, default=False)
+    parser.add_argument('--resume', type=str, default="True")
+    parser.add_argument('--eval-only', type=str, default="False")
     parser.add_argument('--opts', default=None)
     sm_args = parser.parse_args()
     
@@ -221,7 +229,7 @@ if __name__ == "__main__":
     # Launch D2 distributed training
     launch(
         main,
-        sm_args.num_gpus,
+        num_gpus_per_machine=number_of_processes,
         num_machines=number_of_machines,
         machine_rank=machine_rank,
         dist_url=f"tcp://{master_addr}:{master_port}",
