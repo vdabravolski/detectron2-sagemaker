@@ -6,6 +6,7 @@
 # The argument to this script is the image name. This will be used as the image on the local
 # machine and combined with the account and region to form the repository name for ECR.
 image=$1
+dockerfile=$2
 
 if [ "$image" == "" ]
 then
@@ -16,7 +17,7 @@ fi
 chmod +x container_training/train_balloon.py
 chmod +x container_training/train_coco.py
 
-rm -r container_training/detectron2
+#rm -r container_training/detectron2 # TODO: delete it eventually
 
 # Get the account number associated with the current IAM credentials
 account=$(aws sts get-caller-identity --query Account --output text)
@@ -49,7 +50,12 @@ $(aws ecr get-login --region ${region} --no-include-email)
 # Build the docker image locally with the image name and then push it to ECR
 # with the full name.
 
-docker build  -t ${image} .
-docker tag ${image} ${fullname}
+if [ "$dockerfile" == "" ]
+then
+    docker build  -t ${image} .
+else
+    docker build -t ${image} . -f ${dockerfile}
+fi
 
+docker tag ${image} ${fullname}
 docker push ${fullname}
