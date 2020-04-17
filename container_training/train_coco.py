@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 """
 This is a re-implementation of Detectron2 sample training script: https://github.com/facebookresearch/detectron2/blob/master/tools/train_net.py
-
-TODO:
- - remove intermediate checkpoints from model export (to reduce size of model package). It looks like easiest way is to clean up output dir after training.
- - remove log.txt (as it's stored by Sagemaker anyway)
-
 """
 
 # import some common libraries
@@ -16,6 +11,7 @@ import os
 from collections import OrderedDict
 import torch
 import json
+import shutil
     
 # import some common detectron2 utilities
 # TODO: check imports and remove redundant
@@ -124,13 +120,15 @@ def main(sm_args):
     
     if eval_only:
         model = Trainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
+        DetectionCheckpointer(model, save_dir=os.environ['SM_MODEL_DIR']).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=resume)
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
         if comm.is_main_process():
             verify_results(cfg, res)
+            
+        save_model(model=model) # TODO: test if it works.
         return res
 
     """
@@ -143,7 +141,11 @@ def main(sm_args):
         trainer.register_hooks(
             [hooks.EvalHook(0, lambda: trainer.test_with_TTA(cfg, trainer.model))]
         )
-    return trainer.train()
+        
+    res = trainer.train()
+    save_model(model=trainer.model) # TODO: test if it works.
+    
+    return res 
 
 def setup(sm_args):
     """
@@ -212,7 +214,19 @@ def get_sm_world_size(sm_args):
     world_size = number_of_processes * number_of_machines
     
     return number_of_processes, number_of_machines, world_size
+
+
+def save_model(model, model_dir=os.environ['SM_MODEL_DIR']):
+    logger.info("Saving the model.")
+    path = os.path.join(model_dir, 'model_final.pth')
+    # recommended way from http://pytorch.org/docs/master/notes/serialization.html
+    torch.save(model.state_dict(), path)
     
+    # copy checkpoint file to model dir
+    checkpoint_path = os.path.join(os.environ['SM_OUTPUT_DATA_DIR'], "last_checkpoint")
+    new_checkpoint_path = os.path.join(model_dir, "last_checkpoint")
+    shutil.copyfile(checkpoint_path, new_checkpoint_path)
+
 
 if __name__ == "__main__":
     
