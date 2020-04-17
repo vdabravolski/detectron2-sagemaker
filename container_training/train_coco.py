@@ -226,6 +226,11 @@ def save_model(model, model_dir=os.environ['SM_MODEL_DIR']):
     checkpoint_path = os.path.join(os.environ['SM_OUTPUT_DATA_DIR'], "last_checkpoint")
     new_checkpoint_path = os.path.join(model_dir, "last_checkpoint")
     shutil.copyfile(checkpoint_path, new_checkpoint_path)
+    
+    # copy config.yaml to model dir
+    config_path = os.path.join(os.environ['SM_OUTPUT_DATA_DIR'], "config.yaml")
+    new_config_path = os.path.join(model_dir, "config.yaml")
+    shutil.copyfile(checkpoint_path, new_checkpoint_path)
 
 
 if __name__ == "__main__":
