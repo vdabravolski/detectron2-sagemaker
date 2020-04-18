@@ -120,7 +120,7 @@ def main(sm_args):
     
     if eval_only:
         model = Trainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=os.environ['SM_MODEL_DIR']).resume_or_load(
+        DetectionCheckpointer(model).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=resume)
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
@@ -165,9 +165,8 @@ def setup(sm_args):
     # Parameters below are hardcoded as they are specific to Sagemaker environment, no configuration needed.
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo. TODO: check how this works.
     _, _ , world_size = get_sm_world_size(sm_args)
-    
     cfg.SOLVER.IMS_PER_BATCH = world_size # number ims_per_batch should be divisible by number of workers. D2 assertion. TODO: currently equal to world_size
-    cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR']
+    cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR'] # TODO check that this config works fine
     cfg.freeze()
     
     default_setup(cfg, d2_args)
@@ -200,8 +199,11 @@ def opts_to_list(opts):
         ['SOLVER.IMS_PER_BATCH 2 SOLVER.BASE_LR 0.9999'] -> ['SOLVER.IMS_PER_BATCH', '2', 'SOLVER.BASE_LR', '0.9999']
     """
     import re
-    list_opts = re.split('\s+', opts)
-    return list_opts
+    
+    if opts!=None:
+        list_opts = re.split('\s+', opts)
+        return list_opts
+    return ""
 
 
 def get_sm_world_size(sm_args):
@@ -222,15 +224,19 @@ def save_model(model, model_dir=os.environ['SM_MODEL_DIR']):
     # recommended way from http://pytorch.org/docs/master/notes/serialization.html
     torch.save(model.state_dict(), path)
     
-    # copy checkpoint file to model dir
-    checkpoint_path = os.path.join(os.environ['SM_OUTPUT_DATA_DIR'], "last_checkpoint")
-    new_checkpoint_path = os.path.join(model_dir, "last_checkpoint")
-    shutil.copyfile(checkpoint_path, new_checkpoint_path)
-    
     # copy config.yaml to model dir
     config_path = os.path.join(os.environ['SM_OUTPUT_DATA_DIR'], "config.yaml")
     new_config_path = os.path.join(model_dir, "config.yaml")
-    shutil.copyfile(checkpoint_path, new_checkpoint_path)
+    shutil.copyfile(config_path, new_config_path)
+
+    try:
+        # copy checkpoint file to model dir
+        checkpoint_path = os.path.join(os.environ['SM_OUTPUT_DATA_DIR'], "last_checkpoint")
+        new_checkpoint_path = os.path.join(model_dir, "last_checkpoint")
+        shutil.copyfile(checkpoint_path, new_checkpoint_path)
+    except:
+        logger.debug("D2 checkpoint file is not available.")
+    
 
 
 if __name__ == "__main__":
