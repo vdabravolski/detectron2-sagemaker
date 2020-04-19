@@ -22,7 +22,9 @@ import torch
 import numpy as np
 import cv2 # TODO: delete
 
-# from sagemaker_inference import content_types, decoder, default_inference_handler, encoder # TODO: uncomment
+from sagemaker_inference import content_types, decoder, default_inference_handler, encoder
+from sagemaker.content_types import CONTENT_TYPE_JSON, CONTENT_TYPE_CSV, CONTENT_TYPE_NPY # TODO: for local debug only. Remove or comment when deploying remotely.
+from six import StringIO, BytesIO  # TODO: for local debug only. Remove or comment when deploying remotely.
 import os
 
 
@@ -107,56 +109,68 @@ def model_fn(model_dir):
     
     # based on this doc: https://detectron2.readthedocs.io/tutorials/models.html
     cfg = get_cfg()
-    cfg.merge_from_file(config_file)
+    cfg.merge_from_file(config_file) # TODO: since we already have a full fledge config, do we need to do merge_from_file?
     cfg.MODEL.WEIGHTS = model_path
     pred = CocoPredictor(cfg)
     
     return pred
 
-# def input_fn(request_body, request_content_type):
-#     """
-#     https://github.com/aws/sagemaker-pytorch-serving-container/blob/63dfd491ee50539b8c787088672a683ed7df03b3/src/sagemaker_pytorch_serving_container/default_inference_handler.py#L50-L64
-#     """
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # TODO implement here some sort of round robin
-#     np_array = decoder.decode(input_data, content_type) # TODO: uncomment
-#     tensor = torch.FloatTensor(np_array) if content_type in content_types.UTF8_TYPES else torch.from_numpy(np_array) #TODO: uncomment
-#     print("size of tensor:", tensor.size())
-#     return tensor.to(device)
+def input_fn(input_data, content_type):
+#    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # TODO implement here some sort of round robin
+    np_array = decoder.decode(input_data, content_type) # TODO: uncomment
+#    tensor = torch.FloatTensor(np_array) if content_type in content_types.UTF8_TYPES else torch.from_numpy(np_array) #TODO: uncomment
+    print("DEBUG: np_array", np_array)
+    return np_array
 
 def predict_fn(inputs, pred):
     # accroding to D2 rquirements: https://detectron2.readthedocs.io/tutorials/models.html
     outputs = pred(inputs)
     return outputs
 
-
+# Uncomment if you need custom preprocessing of predictor output before sending to the client.
+# By default, this one will be used: https://github.com/aws/sagemaker-pytorch-serving-container/blob/63dfd491ee50539b8c787088672a683ed7df03b3/src/sagemaker_pytorch_serving_container/default_inference_handler.py#L93-L108
 # def output_fn(prediction, response_content_type):
 #     pass
 
 
-# if __name__ == "__main__":
-#     ### Test Stub
-#     data_dir = "datasets/coco/"
-#     dataset  = "val2017"
-#     annFile='{}{}/annotations/instances_{}.json'.format(data_dir,dataset, dataset)
-#     coco=COCO(annFile)
-#     # get all images containing given categories, select one at random
-#     catIds = coco.getCatIds(catNms=['person','dog','skateboard']);
-#     imgIds = coco.getImgIds(catIds=catIds );
-#     imgIds = coco.getImgIds(imgIds = [324158])
-#     img = coco.loadImgs(imgIds[np.random.randint(0,len(imgIds))])[0]
-#     I = io.imread(img['coco_url'])
+def _npy_serialize(data):
+    """
+    Args:
+        data:
+    """
+    buffer = BytesIO()
+    np.save(buffer, data)
+    return buffer.getvalue()
+
+
+if __name__ == "__main__":
     
-#     I_chw = np.transpose(I,(2,0,1)) # convert to expected format CHW
+    # Test Stub to replicate sequence of calls at inference endpoint. Keep it for local debugging. 
+    # This code won't be executed on the Sagemaker endpoint
     
-#     #############
+    # 1. Get the image. Make sure that you point to your valid dir with COCO2017 val dataset
+    data_dir = "../datasets/coco/"
+    dataset  = "val2017"
+    annFile='{}{}/annotations/instances_{}.json'.format(data_dir,dataset, dataset)
+    coco=COCO(annFile)
+    # get all images containing given categories, select one at random
+    catIds = coco.getCatIds(catNms=['person','dog','skateboard']);
+    imgIds = coco.getImgIds(catIds=catIds );
+    imgIds = coco.getImgIds(imgIds = [324158])
+    img = coco.loadImgs(imgIds[np.random.randint(0,len(imgIds))])[0]
+    I = io.imread(img['coco_url'])    
+    I_chw = np.transpose(I,(2,0,1)) # convert to D2 expected format CHW
     
-#     #image = input_fn(I_chw,"")
-#     print(img)
-#     file_path = os.path.join(data_dir, dataset, img['file_name'])
-#     image = cv2.imread(file_path)
-#     pred = model_fn("") #TODO sending dummy var
-#     outputs = predict_fn(image, pred)
+    # 2. Serialize the data
+    _npy_serialize(I_chw)
     
-#     print(outputs)
+    # 3. Deserialize the data
+    image = input_fn(I_chw,CONTENT_TYPE_NPY)
+
+    # 4. 
+    pred = model_fn("../model2_dir") #TODO sending dummy var
+    outputs = predict_fn(image, pred)
+    
+    print(outputs)
     
 
