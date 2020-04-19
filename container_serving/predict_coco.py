@@ -6,6 +6,7 @@
 # TODO list
 # 1. add support of multi-GPU instances - if GPU devices > 1, do round robin
 # 2. do we need to support checkpoints (optimizers, LR etc.)
+# 3. Issue KeyError: 'Non-existent config key: SOLVER.CLIP_GRADIENTS
 
 
 from detectron2.modeling import build_model
@@ -104,13 +105,18 @@ def model_fn(model_dir):
     
     # restoring trained model
     print(model_dir)
-    config_file = os.path.join(model_dir, "config.yaml")
+    config_path = os.path.join(model_dir, "config.yaml")
     model_path = os.path.join(model_dir, "model_final.pth")
+  
+
+    from yacs.config import CfgNode as CN
+    config_file = open(config_path, 'r')
+    cfg = CN.load_cfg(config_file)
+    cfg.MODEL.WEIGHTS = model_path
+    
+    #print(cfg)
     
     # based on this doc: https://detectron2.readthedocs.io/tutorials/models.html
-    cfg = get_cfg()
-    cfg.merge_from_file(config_file) # TODO: since we already have a full fledge config, do we need to do merge_from_file?
-    cfg.MODEL.WEIGHTS = model_path
     pred = CocoPredictor(cfg)
     
     return pred
@@ -147,6 +153,8 @@ if __name__ == "__main__":
     
     # Test Stub to replicate sequence of calls at inference endpoint. Keep it for local debugging. 
     # This code won't be executed on the Sagemaker endpoint
+    from pycocotools.coco import COCO
+    import skimage.io as io
     
     # 1. Get the image. Make sure that you point to your valid dir with COCO2017 val dataset
     data_dir = "../datasets/coco/"
@@ -162,12 +170,12 @@ if __name__ == "__main__":
     I_chw = np.transpose(I,(2,0,1)) # convert to D2 expected format CHW
     
     # 2. Serialize the data
-    _npy_serialize(I_chw)
+    serialized = _npy_serialize(I_chw)
     
     # 3. Deserialize the data
-    image = input_fn(I_chw,CONTENT_TYPE_NPY)
+    image = input_fn(serialized, CONTENT_TYPE_NPY)
 
-    # 4. 
+    # 4. Do prediction and return output
     pred = model_fn("../model2_dir") #TODO sending dummy var
     outputs = predict_fn(image, pred)
     
