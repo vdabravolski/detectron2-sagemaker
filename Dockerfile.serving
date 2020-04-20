@@ -9,6 +9,7 @@ LABEL author="vadimd@amazon.com"
 
 # This is to fix issue: https://github.com/pytorch/vision/issues/1489
 RUN pip install --upgrade --force-reinstall torch torchvision cython
+RUN pip install sagemaker sagemaker_inference # needed for debug purposes only
 
 ############# D2 section ##############
 

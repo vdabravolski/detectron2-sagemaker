@@ -6,7 +6,6 @@
 # TODO list
 # 1. add support of multi-GPU instances - if GPU devices > 1, do round robin
 # 2. do we need to support checkpoints (optimizers, LR etc.)
-# 3. Issue KeyError: 'Non-existent config key: SOLVER.CLIP_GRADIENTS
 
 
 from detectron2.modeling import build_model
@@ -18,7 +17,6 @@ from detectron2.data import (
     build_detection_train_loader,
 )
 import detectron2.data.transforms as T
-#from detectron2.engine import DefaultPredictor
 import torch
 import numpy as np
 import cv2 # TODO: delete
@@ -27,6 +25,7 @@ from sagemaker_inference import content_types, decoder, default_inference_handle
 from sagemaker.content_types import CONTENT_TYPE_JSON, CONTENT_TYPE_CSV, CONTENT_TYPE_NPY # TODO: for local debug only. Remove or comment when deploying remotely.
 from six import StringIO, BytesIO  # TODO: for local debug only. Remove or comment when deploying remotely.
 import os
+import argparse
 
 
 class CocoPredictor:
@@ -103,29 +102,23 @@ def model_fn(model_dir):
     model_dir is location where your trained model will be downloaded.
     """
     
-    # restoring trained model
-    print(model_dir)
+    # Restoring trained model
     config_path = os.path.join(model_dir, "config.yaml")
     model_path = os.path.join(model_dir, "model_final.pth")
-  
 
     from yacs.config import CfgNode as CN
     config_file = open(config_path, 'r')
     cfg = CN.load_cfg(config_file)
     cfg.MODEL.WEIGHTS = model_path
     
-    #print(cfg)
-    
+    # Use simple Predictor class
     # based on this doc: https://detectron2.readthedocs.io/tutorials/models.html
     pred = CocoPredictor(cfg)
     
     return pred
 
 def input_fn(input_data, content_type):
-#    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # TODO implement here some sort of round robin
-    np_array = decoder.decode(input_data, content_type) # TODO: uncomment
-#    tensor = torch.FloatTensor(np_array) if content_type in content_types.UTF8_TYPES else torch.from_numpy(np_array) #TODO: uncomment
-    print("DEBUG: np_array", np_array)
+    np_array = decoder.decode(input_data, content_type)
     return np_array
 
 def predict_fn(inputs, pred):
@@ -141,8 +134,7 @@ def predict_fn(inputs, pred):
 
 def _npy_serialize(data):
     """
-    Args:
-        data:
+    This method is used to debug locally. It won't be used when deployed on remote host.
     """
     buffer = BytesIO()
     np.save(buffer, data)
@@ -150,33 +142,41 @@ def _npy_serialize(data):
 
 
 if __name__ == "__main__":
+    """
+    Test method to replicate sequence of calls at inference endpoint. Keep it for local debugging. 
+    This code won't be executed on the remote Sagemaker endpoint.
+    """
     
-    # Test Stub to replicate sequence of calls at inference endpoint. Keep it for local debugging. 
-    # This code won't be executed on the Sagemaker endpoint
     from pycocotools.coco import COCO
     import skimage.io as io
     
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data-dir', type=str, default=None, help='local directory with coco2017 dataset')
+    parser.add_argument('--dataset', type=str, default="val2017", help='name of coco2017 dataset, default is val2017')
+    parser.add_argument('--model-dir', type=str, default=None, help='local directory with pretrained Detectron2 model')
+    args = parser.parse_args()
+    
+    
     # 1. Get the image. Make sure that you point to your valid dir with COCO2017 val dataset
-    data_dir = "../datasets/coco/"
-    dataset  = "val2017"
-    annFile='{}{}/annotations/instances_{}.json'.format(data_dir,dataset, dataset)
+    annFile='{}{}/annotations/instances_{}.json'.format(args.data_dir,args.dataset, args.dataset)
     coco=COCO(annFile)
     # get all images containing given categories, select one at random
-    catIds = coco.getCatIds(catNms=['person','dog','skateboard']);
-    imgIds = coco.getImgIds(catIds=catIds );
-    imgIds = coco.getImgIds(imgIds = [324158])
-    img = coco.loadImgs(imgIds[np.random.randint(0,len(imgIds))])[0]
-    I = io.imread(img['coco_url'])    
-    I_chw = np.transpose(I,(2,0,1)) # convert to D2 expected format CHW
+    catIds = coco.getCatIds(catNms=['person','dog']);
+    imgIds = coco.getImgIds(catIds=catIds);
+    imgId = imgIds[np.random.randint(len(imgIds))]
+    image_instance = coco.loadImgs(imgId)[0]
+    image_np = io.imread(image_instance['coco_url'])    
     
     # 2. Serialize the data
-    serialized = _npy_serialize(I_chw)
+    image_npy = _npy_serialize(image_np)
+    
+    ##### simulate sending over the wire ######
     
     # 3. Deserialize the data
-    image = input_fn(serialized, CONTENT_TYPE_NPY)
+    image = input_fn(image_npy, CONTENT_TYPE_NPY)
 
     # 4. Do prediction and return output
-    pred = model_fn("../model2_dir") #TODO sending dummy var
+    pred = model_fn(args.model_dir) #TODO if you want test locally, then update this dir path to your local holder with D2 model wights and config.
     outputs = predict_fn(image, pred)
     
     print(outputs)
