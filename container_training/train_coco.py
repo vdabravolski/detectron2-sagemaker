@@ -154,7 +154,14 @@ def setup(sm_args):
     
     # D2 expects ArgParser.NameSpace object to ammend Cfg node.
     # We are constructing artificial ArgParse object here. TODO: consider refactoring it in future.
-    config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
+    
+    # based on user input, selecting a correct base config file
+    if sm_args.local_config_file != None:
+        config_file_path = f"{os.environ['SM_MODULE_DIR']}/{sm_args.local_config_file}"
+    else:
+        config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
+        
+    
     d2_args = custom_argument_parser(config_file_path, sm_args.opts, sm_args.resume, sm_args.eval_only)
     
     cfg = get_cfg()
@@ -163,7 +170,7 @@ def setup(sm_args):
     cfg.merge_from_list(list_opts) # override defaults params from D2 config_file with user defined hyperparameters
 
     # Parameters below are hardcoded as they are specific to Sagemaker environment, no configuration needed.
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo. TODO: check how this works.
+#    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo. TODO: we need to delete it.
     _, _ , world_size = get_sm_world_size(sm_args)
     cfg.SOLVER.IMS_PER_BATCH = world_size # number ims_per_batch should be divisible by number of workers. D2 assertion. TODO: currently equal to world_size
     cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR'] # TODO check that this config works fine
@@ -250,9 +257,13 @@ if __name__ == "__main__":
     parser.add_argument('--model-dir', type=str, default=os.environ["SM_MODEL_DIR"])
     parser.add_argument('--num-gpus', type=int, default=os.environ["SM_NUM_GPUS"])
     parser.add_argument('--num-cpus', type=int, default=os.environ["SM_NUM_CPUS"])
-    parser.add_argument('--config-file', default="", metavar="FILE")
     parser.add_argument('--resume', type=str, default="True")
     parser.add_argument('--eval-only', type=str, default="False")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--config-file', type=str, default=None, metavar="FILE", help="If config file specificed, then one of the Detectron2 configs will be used. \
+                       Refer to https://github.com/facebookresearch/detectron2/tree/master/configs")
+    group.add_argument('--local-config-file', type=str, default=None, metavar="FILE", help="If local config file specified, then config file \
+                       from container_training directory will be used.")
     parser.add_argument('--opts', default=None)
     sm_args = parser.parse_args()
     
