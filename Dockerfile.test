@@ -1,0 +1,16 @@
+# using Sagemaker PyTorch container as base image
+# https://github.com/aws/sagemaker-pytorch-container/blob/master/docker/1.4.0/py3/Dockerfile.gpu
+FROM 763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-inference:1.4.0-gpu-py36-cu101-ubuntu16.04
+
+#COPY container_test /opt/ml/code
+#WORKDIR /opt/ml/code
+
+#ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
+#ENV SAGEMAKER_PROGRAM predict.py
+
+WORKDIR /
+
+# Starts PyTorch serving container
+#EXPOSE 8080 8081
+#ENTRYPOINT ["python", "/usr/local/bin/dockerd-entrypoint.py"]
+#CMD ["mxnet-model-server", "--start", "--mms-config", "/home/model-server/config.properties"]
