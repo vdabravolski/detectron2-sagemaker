@@ -70,47 +70,89 @@ def model_fn(model_dir):
     
     logger.info("Deserializing Detectron2 model...")
     
-    # Restoring trained model, take a first .yaml and .pth/.pkl file in the model directory
-    for file in os.listdir(model_dir):
-        # looks up for yaml file with model config
-        if file.endswith(".yaml"):
-            config_path = os.path.join(model_dir, file)
-        # looks up for *.pkl or *.pth files with model weights
-        if file.endswith(".pth") or file.endswith(".pkl"):
-            model_path = os.path.join(model_dir, file)
-            
-    logger.info(f"Using config file {config_path}")
-    logger.info(f"Using model weights from {model_path}")            
-    
-    pred = _get_predictor(config_path,model_path)
-    logger.info(f"Deserialization completed ...")
+    try:
+        # Restoring trained model, take a first .yaml and .pth/.pkl file in the model directory
+        for file in os.listdir(model_dir):
+            # looks up for yaml file with model config
+            if file.endswith(".yaml"):
+                config_path = os.path.join(model_dir, file)
+            # looks up for *.pkl or *.pth files with model weights
+            if file.endswith(".pth") or file.endswith(".pkl"):
+                model_path = os.path.join(model_dir, file)
+
+        logger.info(f"Using config file {config_path}")
+        logger.info(f"Using model weights from {model_path}")            
+
+        pred = _get_predictor(config_path,model_path)
+        
+    except Exception as e:
+        logger.error("Model deserialization failed...")
+        logger.error(e)  
+        
+    logger.info("Deserialization completed ...")
     
     return pred
 
 
-def input_fn(input_data, content_type=CONTENT_TYPE_NPY):
+def input_fn(request_body, request_content_type):
     """
     Converts image from NPY format to numpy.
     """
-    
     logger.info("Handling inputs...")
-    image_np = decoder.decode(input_data, content_type)
+    logger.info(request_content_type)
+    logger.info(type(request_body))
     
-    return image_np
+    try:
+        input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
+    except Exception as e:
+        logger.error("Input deserialization failed...")
+        logger.error(e)  
+        return None
+    
+    logger.info("Input deserialization completed...")
+    logger.info(f"Input object type is {type(input_object)} and shape {input_object.shape}")
+
+    return input_object
 
 
-def predict_fn(inputs, predictor):
-    # accroding to D2 rquirements: https://detectron2.readthedocs.io/tutorials/models.html
+def predict_fn(input_object, model):
+    # according to D2 rquirements: https://detectron2.readthedocs.io/tutorials/models.html
+    
     logger.info("Doing predictions...")
-    outputs = predictor(inputs)
-    logger.debug(outputs)
-    return outputs
+    logger.debug(f"Input object type is {type(input_object)} and shape {input_object.shape}")
+    logger.debug(f"Predictor type is {type(model)}")
+    
+    try:
+        prediction = model(input_object)
+    except Exception as e:
+        logger.error("Prediction failed...")
+        logger.error(e)
+        return None
+    
+    logger.debug(f"Predicted output type is {prediction}")
+    logger.debug(prediction)
+    
+    return prediction
 
-def output_fn(predictions, response_content_type=None):
-    logger.info("processing outputs...")
-    pickled_outputs = pickle.dumps(predictions)
-    stream = io.BytesIO(pickled_outputs)
-    return stream.getvalue()
+def output_fn(prediction, response_content_type):
+    
+    logger.info("Processing output predictions...")
+    logger.debug(f"Output object type is {type(prediction)}")    
+    
+    try:
+        pickled_outputs = pickle.dumps(prediction)
+        stream = io.BytesIO(pickled_outputs)
+        output = stream.getvalue()
+        
+    except Exception as e:
+        logger.error("Output processing failed...")
+        logger.error(e)
+        return None
+    
+    logger.info("Output processing completed")
+    logger.debug(f"Predicted output type is {type(output)}")
+
+    return output
 
 
 if __name__ == "__main__":
@@ -145,7 +187,7 @@ if __name__ == "__main__":
     predictions = predict_fn(image_np, predictor)
     
     # 6. Serialize D2 custom output to binary format for response body
-    outputs = output_fn(predictions)
+    outputs = output_fn(predictions, None)
     
     
     
