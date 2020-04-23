@@ -33,11 +33,14 @@ ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
 
 # cloning D2 to code dir as we need access to default congigs
 # to test that this is correct directory to place D2 sources
-#WORKDIR /opt/ml/model/code/
-#RUN git clone 'https://github.com/facebookresearch/detectron2.git'
+WORKDIR /opt/ml/model/code/
+RUN git clone 'https://github.com/facebookresearch/detectron2.git'
 
+COPY /container_serving /opt/ml/code
+ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
+ENV SAGEMAKER_PROGRAM cifar10.py
 
-#WORKDIR /
+WORKDIR /
 
 # Starts PyTorch serving container
 EXPOSE 8080 8081
