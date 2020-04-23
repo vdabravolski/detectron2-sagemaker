@@ -23,24 +23,21 @@ ENV TORCH_CUDA_ARCH_LIST="Volta"
 
 # Build D2 from latest sources TODO: replace fork with original repo
 RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
+# temporary installing from wheel, TODO: it will result in "Undefined C++ symbols"
+# RUN pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu101/index.html
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
 # set location of training datasetm, Sagemaker containers copy all data from S3 to /opt/ml/input/data/{channels}
 ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
 
-############# SageMaker section ##############
-
-COPY container_serving /opt/ml/code
-WORKDIR /opt/ml/code
-
 # cloning D2 to code dir as we need access to default congigs
-RUN git clone 'https://github.com/facebookresearch/detectron2.git'
+# to test that this is correct directory to place D2 sources
+#WORKDIR /opt/ml/model/code/
+#RUN git clone 'https://github.com/facebookresearch/detectron2.git'
 
-ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
-ENV SAGEMAKER_PROGRAM predict_coco.py
 
-WORKDIR /
+#WORKDIR /
 
 # Starts PyTorch serving container
 EXPOSE 8080 8081
