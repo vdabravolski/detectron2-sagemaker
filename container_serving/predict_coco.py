@@ -17,6 +17,7 @@ from yacs.config import CfgNode as CN
 import numpy as np
 from PIL import Image
 import cv2
+import json
 
 import torch
 from detectron2.engine import DefaultPredictor
@@ -143,12 +144,31 @@ def predict_fn(input_object, model):
 def output_fn(prediction, response_content_type):
     
     logger.info("Processing output predictions...")
-    logger.debug(f"Output object type is {type(prediction)}")    
+    logger.debug(f"Output object type is {type(prediction)}")
     
     try:
-        pickled_outputs = pickle.dumps(prediction)
-        stream = io.BytesIO(pickled_outputs)
-        output = stream.getvalue()
+        if "json" in response_content_type:
+            instances = prediction["instances"]
+            scores = instances.get_fields()["scores"].tolist()
+            pred_classes = instances.get_fields()["pred_classes"].tolist()
+            pred_boxes = instances.get_fields()["pred_boxes"].tensor.tolist()
+            
+            response = {
+                "scores": scores,
+                "pred_classes": pred_classes,
+                "pred_boxes" : pred_boxes
+            }
+            
+            output = json.dumps(response)
+
+        elif "detectron2" in response_content_type:
+            
+            pickled_outputs = pickle.dumps(prediction)
+            stream = io.BytesIO(pickled_outputs)
+            output = stream.getvalue()
+            
+        else:
+            raise Exception(f"Unsupported response content type {response_content_type}")
         
     except Exception as e:
         logger.error("Output processing failed...")
@@ -159,41 +179,6 @@ def output_fn(prediction, response_content_type):
     logger.debug(f"Predicted output type is {type(output)}")
 
     return output
-
-
-if __name__ == "__main__":
-    """
-    Test method to replicate sequence of calls at inference endpoint. Keep it for local debugging. 
-    This code won't be executed on the remote Sagemaker endpoint.
-    """
-    
-    from PIL import Image
-    
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--image', type=str, default="../coco_sample.jpg", help='point to test image from coco2017 dataset')
-    parser.add_argument('--model-dir', type=str, default="../", help='directory with model weights and configs')
-    args = parser.parse_args()
-    
-    #1. Get the image
-    image = Image.open(args.image)
-    image_np = np.asarray(image)
-        
-    # 2. Serialize the data
-    image_npy = encoder.encode(image_np, CONTENT_TYPE_NPY)
-    
-    ##### simulate sending over the wire ######
-    
-    # 3. Deserialize the data
-    image_np = input_fn(image_npy, CONTENT_TYPE_NPY)
-    
-    # 4. Deserialize the model
-    predictor = model_fn(args.model_dir)
-
-    # 5. Do prediction and return output
-    predictions = predict_fn(image_np, predictor)
-    
-    # 6. Serialize D2 custom output to binary format for response body
-    outputs = output_fn(predictions, None)
     
     
     
