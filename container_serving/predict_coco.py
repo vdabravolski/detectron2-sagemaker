@@ -15,6 +15,8 @@ import sys
 import pickle    
 from yacs.config import CfgNode as CN
 import numpy as np
+from PIL import Image
+import cv2
 
 import torch
 from detectron2.engine import DefaultPredictor
@@ -48,7 +50,6 @@ def _get_predictor(config_path, model_path):
     pred = DefaultPredictor(cfg)
     logger.info(cfg)
     eval_results = pred.model.eval()
-    #logger.debug(eval_results)
     
     pred.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
     checkpointer = DetectionCheckpointer(pred.model)
@@ -98,17 +99,22 @@ def input_fn(request_body, request_content_type):
     """
     Converts image from NPY format to numpy.
     """
-    logger.info("Handling inputs...")
-    logger.info(request_content_type)
-    logger.info(type(request_body))
+    logger.info(f"Handling inputs...Content type is {request_content_type}")
     
     try:
-        input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
+        if "application/x-npy" in request_content_type:
+            input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
+        elif "jpeg" in request_content_type:
+            nparr = np.frombuffer(request_body, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            input_object = np.asarray(img)
+        else:
+            raise Exception(f"Unsupported request content type {request_content_type}")
     except Exception as e:
         logger.error("Input deserialization failed...")
         logger.error(e)  
         return None
-    
+            
     logger.info("Input deserialization completed...")
     logger.info(f"Input object type is {type(input_object)} and shape {input_object.shape}")
 
