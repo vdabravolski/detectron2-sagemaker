@@ -12,6 +12,8 @@ from collections import OrderedDict
 import torch
 import json
 import shutil
+from torch.nn.parallel import DistributedDataParallel
+
     
 # import some common detectron2 utilities
 # TODO: check imports and remove redundant
@@ -19,6 +21,9 @@ import detectron2.utils.comm as comm
 from detectron2 import model_zoo
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
+from detectron2.modeling import  build_model
+from detectron2.checkpoint import DetectionCheckpointer, PeriodicCheckpointer
+from detectron2.solver import build_lr_scheduler, build_optimizer
 from detectron2.data import MetadataCatalog
 from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, hooks, launch
 from detectron2.evaluation import (
@@ -31,6 +36,20 @@ from detectron2.evaluation import (
     SemSegEvaluator,
     verify_results,
 )
+from detectron2.utils.events import (
+    CommonMetricPrinter,
+    EventStorage,
+    JSONWriter,
+    TensorboardXWriter,
+)
+
+from detectron2.data import (
+    MetadataCatalog,
+    build_detection_test_loader,
+    build_detection_train_loader,
+)
+
+
 from detectron2.modeling import GeneralizedRCNNWithTTA
 
 from detectron2.utils.logger import setup_logger
@@ -39,115 +58,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
-class Trainer(DefaultTrainer):
-    """
-    We use the "DefaultTrainer" which contains pre-defined default logic for
-    standard training workflow. They may not work for you, especially if you
-    are working on a new research project. In that case you can use the cleaner
-    "SimpleTrainer", or write your own training loop. You can use
-    "tools/plain_train_net.py" as an example.
-    """
 
-    @classmethod
-    def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        """
-        Create evaluator(s) for a given dataset.
-        This uses the special metadata "evaluator_type" associated with each builtin dataset.
-        For your own dataset, you can simply create an evaluator manually in your
-        script and do not have to worry about the hacky if-else logic here.
-        """
-        if output_folder is None:
-            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
-        evaluator_list = []
-        evaluator_type = MetadataCatalog.get(dataset_name).evaluator_type
-        if evaluator_type in ["sem_seg", "coco_panoptic_seg"]:
-            evaluator_list.append(
-                SemSegEvaluator(
-                    dataset_name,
-                    distributed=True,
-                    num_classes=cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES,
-                    ignore_label=cfg.MODEL.SEM_SEG_HEAD.IGNORE_VALUE,
-                    output_dir=output_folder,
-                )
-            )
-        if evaluator_type in ["coco", "coco_panoptic_seg"]:
-            evaluator_list.append(COCOEvaluator(dataset_name, cfg, True, output_folder))
-        if evaluator_type == "coco_panoptic_seg":
-            evaluator_list.append(COCOPanopticEvaluator(dataset_name, output_folder))
-        elif evaluator_type == "cityscapes":
-            assert (
-                torch.cuda.device_count() >= comm.get_rank()
-            ), "CityscapesEvaluator currently do not work with multiple machines."
-            return CityscapesEvaluator(dataset_name)
-        elif evaluator_type == "pascal_voc":
-            return PascalVOCDetectionEvaluator(dataset_name)
-        elif evaluator_type == "lvis":
-            return LVISEvaluator(dataset_name, cfg, True, output_folder)
-        if len(evaluator_list) == 0:
-            raise NotImplementedError(
-                "no Evaluator for the dataset {} with the type {}".format(
-                    dataset_name, evaluator_type
-                )
-            )
-        elif len(evaluator_list) == 1:
-            return evaluator_list[0]
-        return DatasetEvaluators(evaluator_list)
-
-    @classmethod
-    def test_with_TTA(cls, cfg, model):
-        logger = logging.getLogger("detectron2.trainer")
-        # In the end of training, run an evaluation with TTA
-        # Only support some R-CNN models.
-        logger.info("Running inference with test-time augmentation ...")
-        model = GeneralizedRCNNWithTTA(cfg, model)
-        evaluators = [
-            cls.build_evaluator(
-                cfg, name, output_folder=os.path.join(cfg.OUTPUT_DIR, "inference_TTA")
-            )
-            for name in cfg.DATASETS.TEST
-        ]
-        res = cls.test(cfg, model, evaluators)
-        res = OrderedDict({k + "_TTA": v for k, v in res.items()})
-        return res
-
-def main(sm_args):
-    
-    cfg = setup(sm_args)
-        
-    # Converting string params to boolean flags as Sagemaker doesn't support currently boolean flags as hyperparameters.
-    eval_only = True if sm_args.eval_only=="True" else False
-    resume = True if sm_args.resume=="True" else False
-    
-    if eval_only:
-        model = Trainer.build_model(cfg)
-        DetectionCheckpointer(model).resume_or_load(
-            cfg.MODEL.WEIGHTS, resume=resume)
-        res = Trainer.test(cfg, model)
-        if cfg.TEST.AUG.ENABLED:
-            res.update(Trainer.test_with_TTA(cfg, model))
-        if comm.is_main_process():
-            verify_results(cfg, res)
-            
-        save_model(model=model) # TODO: test if it works.
-        return res
-
-    """
-    If you'd like to do anything fancier than the standard training logic,
-    consider writing your own training loop or subclassing the trainer.
-    """
-    trainer = Trainer(cfg)
-    trainer.resume_or_load(resume=resume)
-    if cfg.TEST.AUG.ENABLED:
-        trainer.register_hooks(
-            [hooks.EvalHook(0, lambda: trainer.test_with_TTA(cfg, trainer.model))]
-        )
-        
-    res = trainer.train()
-    save_model(model=trainer.model) # TODO: test if it works.
-    
-    return res 
-
-def setup(sm_args):
+def _setup(sm_args):
     """
     Create D2 configs and perform basic setups.  
     """
@@ -162,16 +74,15 @@ def setup(sm_args):
         config_file_path = f"{os.environ['SM_MODULE_DIR']}/detectron2/configs/{sm_args.config_file}"
         
     
-    d2_args = custom_argument_parser(config_file_path, sm_args.opts, sm_args.resume, sm_args.eval_only)
+    d2_args = _custom_argument_parser(config_file_path, sm_args.opts, sm_args.resume, sm_args.eval_only)
     
     cfg = get_cfg()
     cfg.merge_from_file(config_file_path) # get baseline parameters from YAML config
-    list_opts = opts_to_list(sm_args.opts) # convert training hyperparameters from SM format to D2
+    list_opts = _opts_to_list(sm_args.opts) # convert training hyperparameters from SM format to D2
     cfg.merge_from_list(list_opts) # override defaults params from D2 config_file with user defined hyperparameters
 
     # Parameters below are hardcoded as they are specific to Sagemaker environment, no configuration needed.
-#    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(sm_args.config_file)  # Let training initialize from model zoo. TODO: we need to delete it.
-    _, _ , world_size = get_sm_world_size(sm_args)
+    _, _ , world_size = _get_sm_world_size(sm_args)
     cfg.SOLVER.IMS_PER_BATCH = world_size # number ims_per_batch should be divisible by number of workers. D2 assertion. TODO: currently equal to world_size
     cfg.OUTPUT_DIR = os.environ['SM_OUTPUT_DATA_DIR'] # TODO check that this config works fine
     cfg.freeze()
@@ -181,7 +92,7 @@ def setup(sm_args):
     return cfg
     
 
-def custom_argument_parser(config_file, opts, resume, eval_only):
+def _custom_argument_parser(config_file, opts, resume, eval_only):
     """
     Create a parser with some common arguments for Detectron2 training script.
     Returns:
@@ -199,7 +110,7 @@ def custom_argument_parser(config_file, opts, resume, eval_only):
                              "--opts", opts])
     return args
 
-def opts_to_list(opts):
+def _opts_to_list(opts):
     """
     This function takes a string and converts it to list of string params (YACS expected format). 
     E.g.:
@@ -213,7 +124,7 @@ def opts_to_list(opts):
     return ""
 
 
-def get_sm_world_size(sm_args):
+def _get_sm_world_size(sm_args):
     """
     Calculates number of devices in Sagemaker distributed cluster
     """
@@ -225,7 +136,7 @@ def get_sm_world_size(sm_args):
     return number_of_processes, number_of_machines, world_size
 
 
-def save_model(model, model_dir=os.environ['SM_MODEL_DIR']):
+def _save_model(model, model_dir=os.environ['SM_MODEL_DIR']):
     logger.info("Saving the model.")
     path = os.path.join(model_dir, 'model_final.pth')
     # recommended way from http://pytorch.org/docs/master/notes/serialization.html
@@ -243,8 +154,119 @@ def save_model(model, model_dir=os.environ['SM_MODEL_DIR']):
         shutil.copyfile(checkpoint_path, new_checkpoint_path)
     except:
         logger.debug("D2 checkpoint file is not available.")
-    
 
+def do_test(cfg, model):
+    results = OrderedDict()
+    for dataset_name in cfg.DATASETS.TEST:
+        data_loader = build_detection_test_loader(cfg, dataset_name)
+        evaluator = get_evaluator(
+            cfg, dataset_name, os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
+        )
+        results_i = inference_on_dataset(model, data_loader, evaluator)
+        results[dataset_name] = results_i
+        if comm.is_main_process():
+            logger.info("Evaluation results for {} in csv format:".format(dataset_name))
+            print_csv_format(results_i)
+    if len(results) == 1:
+        results = list(results.values())[0]
+    return results
+
+        
+def do_train(cfg, model, resume=False):
+    model.train()
+    optimizer = build_optimizer(cfg, model)
+    scheduler = build_lr_scheduler(cfg, optimizer)
+
+    checkpointer = DetectionCheckpointer(
+        model, cfg.OUTPUT_DIR, optimizer=optimizer, scheduler=scheduler
+    )
+    start_iter = (
+        checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
+    )
+    max_iter = cfg.SOLVER.MAX_ITER
+
+    periodic_checkpointer = PeriodicCheckpointer(
+        checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD, max_iter=max_iter
+    )
+
+    writers = (
+        [
+            CommonMetricPrinter(max_iter),
+            JSONWriter(os.path.join(cfg.OUTPUT_DIR, "metrics.json")),
+            TensorboardXWriter(cfg.OUTPUT_DIR),
+        ]
+        if comm.is_main_process()
+        else []
+    )
+
+    # compared to "train_net.py", we do not support accurate timing and
+    # precise BN here, because they are not trivial to implement
+    data_loader = build_detection_train_loader(cfg)
+    logger.info("Starting training from iteration {}".format(start_iter))
+    with EventStorage(start_iter) as storage:
+        for data, iteration in zip(data_loader, range(start_iter, max_iter)):
+            iteration = iteration + 1
+            storage.step()
+
+            loss_dict = model(data)
+            losses = sum(loss_dict.values())
+            assert torch.isfinite(losses).all(), loss_dict
+
+            loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
+            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+            if comm.is_main_process():
+                storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
+
+            optimizer.zero_grad()
+            losses.backward()
+            optimizer.step()
+            storage.put_scalar("lr", optimizer.param_groups[0]["lr"], smoothing_hint=False)
+            scheduler.step()
+
+            if (
+                cfg.TEST.EVAL_PERIOD > 0
+                and iteration % cfg.TEST.EVAL_PERIOD == 0
+                and iteration != max_iter
+            ):
+                do_test(cfg, model)
+                # Compared to "train_net.py", the test results are not dumped to EventStorage
+                comm.synchronize()
+
+            if iteration - start_iter > 5 and (iteration % 20 == 0 or iteration == max_iter):
+                for writer in writers:
+                    writer.write()
+            periodic_checkpointer.step(iteration)
+
+            
+
+def main(sm_args):
+    
+    cfg = _setup(sm_args)
+    
+    model = build_model(cfg)
+    
+    # Converting string params to boolean flags as Sagemaker doesn't support currently boolean flags as hyperparameters.
+    eval_only = True if sm_args.eval_only=="True" else False
+    resume = True if sm_args.resume=="True" else False
+    
+    if eval_only:
+        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
+            cfg.MODEL.WEIGHTS, resume=args.resume
+        )
+        return do_test(cfg, model)
+
+    distributed = comm.get_world_size() > 1
+    
+    if distributed:
+        model = DistributedDataParallel(
+            model, device_ids=[comm.get_local_rank()], broadcast_buffers=False
+        )
+
+    do_train(cfg, model, resume=resume)
+    _save_model(model)
+    
+    return do_test(cfg, model)
+    
 
 if __name__ == "__main__":
     
@@ -268,7 +290,7 @@ if __name__ == "__main__":
     sm_args = parser.parse_args()
     
     # Derive parameters of distributed training
-    number_of_processes, number_of_machines, world_size = get_sm_world_size(sm_args)
+    number_of_processes, number_of_machines, world_size = _get_sm_world_size(sm_args)
     logger.info('Running \'{}\' backend on {} nodes and {} processes. World size is {}.'.
                 format(sm_args.backend, number_of_machines, number_of_processes, world_size))
     machine_rank = sm_args.hosts.index(sm_args.current_host)
