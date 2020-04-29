@@ -1,4 +1,4 @@
-# Build an image of Detectron2 that can do distributing training on Amazon Sagemaker 
+# Build an image of Detectron2 with Sagemaker Multi Model Server: https://github.com/awslabs/multi-model-server
 
 # using Sagemaker PyTorch container as base image
 # https://github.com/aws/sagemaker-pytorch-container/blob/master/docker/1.4.0/py3/Dockerfile.gpu
@@ -13,7 +13,7 @@ RUN pip install sagemaker sagemaker_inference # needed for debug purposes only
 
 ############# D2 section ##############
 
-# installing dependecies for D2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
+# installing dependencies for D2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
 RUN pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
 RUN pip install 'git+https://github.com/facebookresearch/fvcore'
 
@@ -21,10 +21,8 @@ ENV FORCE_CUDA="1"
 # Build D2 only for Volta architecture - V100 chips (ml.p3 AWS instances)
 ENV TORCH_CUDA_ARCH_LIST="Volta" 
 
-# Build D2 from latest sources TODO: replace fork with original repo
+# Build D2 from latest sources
 RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
-# temporary installing from wheel, TODO: it will result in "Undefined C++ symbols"
-# RUN pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu101/index.html
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
