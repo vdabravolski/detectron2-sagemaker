@@ -45,21 +45,24 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 def _get_predictor(config_path, model_path):
     
     cfg = get_cfg()
+    
     cfg.merge_from_file(config_path) # get baseline parameters from YAML config
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
     cfg.MODEL.WEIGHTS = model_path
 
     pred = DefaultPredictor(cfg)
     logger.info(cfg)
     eval_results = pred.model.eval()
     
-    pred.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
-    checkpointer = DetectionCheckpointer(pred.model)
-    checkpointer.load(cfg.MODEL.WEIGHTS)
-    pred.transform_gen = T.ResizeShortestEdge([cfg.INPUT.MIN_SIZE_TEST, 
-                                               cfg.INPUT.MIN_SIZE_TEST], cfg.INPUT.MAX_SIZE_TEST)
+#     pred.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
+#     checkpointer = DetectionCheckpointer(pred.model)
+#     checkpointer.load(cfg.MODEL.WEIGHTS)
+#     pred.transform_gen = T.ResizeShortestEdge([cfg.INPUT.MIN_SIZE_TEST, 
+#                                                cfg.INPUT.MIN_SIZE_TEST], cfg.INPUT.MAX_SIZE_TEST)
 
-    pred.input_format = cfg.INPUT.FORMAT
-    assert pred.input_format in ["RGB", "BGR"], pred.input_format
+#     pred.input_format = cfg.INPUT.FORMAT
+#     assert pred.input_format in ["RGB", "BGR"], pred.input_format
+    
     return pred
 
 
@@ -135,8 +138,8 @@ def predict_fn(input_object, model):
         logger.error("Prediction failed...")
         logger.error(e)
         return None
-    
-    logger.debug(f"Predicted output type is {prediction}")
+
+    logger.debug("Predictions are:")
     logger.debug(prediction)
     
     return prediction
@@ -148,24 +151,38 @@ def output_fn(prediction, response_content_type):
     
     try:
         if "json" in response_content_type:
+            
             instances = prediction["instances"]
-            scores = instances.get_fields()["scores"].tolist()
-            pred_classes = instances.get_fields()["pred_classes"].tolist()
-            pred_boxes = instances.get_fields()["pred_boxes"].tensor.tolist()
+            output = {}
             
-            response = {
-                "scores": scores,
-                "pred_classes": pred_classes,
-                "pred_boxes" : pred_boxes
-            }
+            # Iterate over fields in Instances
+            for field, value in instances.get_fields():
+                logger.debug(field)
+                logger.debug(value)
+                if field=="scores":
+                    output[field] = instances.get_fields()[field].tolist()
+                if field=="pred_classes":
+                    output[field] = instances.get_fields()[field].tolist()
+                if field=="pred_boxes":
+                    output[field] = instances.get_fields()[field].tensor.tolist()
+                if field=="pred_masks":
+                    output[field] = instances.get_fields()[field].tolist()
             
-            output = json.dumps(response)
+            output['image_size'] = instances.image_size
+            
+            logger.debug(output)
+            output = json.dumps(output)
 
         elif "detectron2" in response_content_type:
             
+            logger.debug("check prediction before pickling")
+            logger.debug(type(prediction))
             pickled_outputs = pickle.dumps(prediction)
             stream = io.BytesIO(pickled_outputs)
             output = stream.getvalue()
+            logger.debug("size of stream")
+            logger.debug(output.__sizeof__())
+#            output = pickled_outputs # TODO: test if this would work.
             
         else:
             raise Exception(f"Unsupported response content type {response_content_type}")
