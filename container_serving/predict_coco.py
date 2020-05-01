@@ -36,6 +36,7 @@ from detectron2.config import get_cfg
 from sagemaker_inference import content_types, decoder, default_inference_handler, encoder
 from sagemaker.content_types import CONTENT_TYPE_JSON, CONTENT_TYPE_CSV, CONTENT_TYPE_NPY # TODO: for local debug only. Remove or comment when deploying remotely.
 from six import StringIO, BytesIO  # TODO: for local debug only. Remove or comment when deploying remotely.
+from d2_deserializer import d2_to_json
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -148,41 +149,17 @@ def output_fn(prediction, response_content_type):
     
     logger.info("Processing output predictions...")
     logger.debug(f"Output object type is {type(prediction)}")
-    
+        
     try:
         if "json" in response_content_type:
-            
-            instances = prediction["instances"]
-            output = {}
-            
-            # Iterate over fields in Instances
-            for field, value in instances.get_fields():
-                logger.debug(field)
-                logger.debug(value)
-                if field=="scores":
-                    output[field] = instances.get_fields()[field].tolist()
-                if field=="pred_classes":
-                    output[field] = instances.get_fields()[field].tolist()
-                if field=="pred_boxes":
-                    output[field] = instances.get_fields()[field].tensor.tolist()
-                if field=="pred_masks":
-                    output[field] = instances.get_fields()[field].tolist()
-            
-            output['image_size'] = instances.image_size
-            
-            logger.debug(output)
-            output = json.dumps(output)
+            output = json.dumps(d2_to_json(prediction))
 
         elif "detectron2" in response_content_type:
-            
             logger.debug("check prediction before pickling")
             logger.debug(type(prediction))
             pickled_outputs = pickle.dumps(prediction)
             stream = io.BytesIO(pickled_outputs)
             output = stream.getvalue()
-            logger.debug("size of stream")
-            logger.debug(output.__sizeof__())
-#            output = pickled_outputs # TODO: test if this would work.
             
         else:
             raise Exception(f"Unsupported response content type {response_content_type}")
