@@ -152,11 +152,20 @@ def output_fn(prediction, response_content_type):
         
     try:
         if "json" in response_content_type:
-            output = json.dumps(d2_to_json(prediction))
+            output = d2_to_json(prediction)
 
         elif "detectron2" in response_content_type:
             logger.debug("check prediction before pickling")
             logger.debug(type(prediction))
+            
+            # convert
+            instances = prediction['instances']
+            instances.pred_masks_rle = [mask_util.encode(np.asfortranarray(mask)) for mask in instances.pred_masks]
+            for rle in instances.pred_masks_rle:
+                rle['counts'] = rle['counts'].decode('utf-8')
+
+            instances.remove('pred_masks')
+            
             pickled_outputs = pickle.dumps(prediction)
             stream = io.BytesIO(pickled_outputs)
             output = stream.getvalue()
