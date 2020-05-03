@@ -36,7 +36,8 @@ from detectron2.config import get_cfg
 from sagemaker_inference import content_types, decoder, default_inference_handler, encoder
 from sagemaker.content_types import CONTENT_TYPE_JSON, CONTENT_TYPE_CSV, CONTENT_TYPE_NPY # TODO: for local debug only. Remove or comment when deploying remotely.
 from six import StringIO, BytesIO  # TODO: for local debug only. Remove or comment when deploying remotely.
-from d2_deserializer import d2_to_json
+import d2_deserializer
+import pycocotools.mask as mask_util
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -152,18 +153,15 @@ def output_fn(prediction, response_content_type):
         
     try:
         if "json" in response_content_type:
-            output = d2_to_json(prediction)
+            output = d2_deserializer.d2_to_json(prediction)
 
         elif "detectron2" in response_content_type:
             logger.debug("check prediction before pickling")
             logger.debug(type(prediction))
             
-            # convert
             instances = prediction['instances']
-            instances.pred_masks_rle = [mask_util.encode(np.asfortranarray(mask)) for mask in instances.pred_masks]
-            for rle in instances.pred_masks_rle:
-                rle['counts'] = rle['counts'].decode('utf-8')
-
+            rle_masks = d2_deserializer.convert_masks_to_rle(instances.get_fields()["pred_masks"])
+            instances.set("pred_masks_rle", rle_masks)
             instances.remove('pred_masks')
             
             pickled_outputs = pickle.dumps(prediction)

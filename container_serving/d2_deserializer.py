@@ -52,23 +52,37 @@ def d2_to_json(predictions):
         if k=="pred_boxes":
             output[k] = v.tensor.tolist()
             
-        if k=="pred_masks":
-            # Convert masks to pycoco binary RLE format to reduce size
-            # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/mask.py
-            
-            v = v.cpu()
-            output["pred_masks_rle"] = [mask_util.encode(np.asfortranarray(mask)) for mask in v]
-            
-            for rle in output["pred_masks_rle"]:
-                rle['counts'] = rle['counts'].decode('utf-8')
+        if k=="pred_masks":            
+            output["pred_masks_rle"] = convert_masks_to_rle(v)
     
+    instances.remove('pred_masks')
+            
     # Store image size
     output['image_size'] = instances.image_size
-
     output = json.dumps(output)
     
     return output
 
+
+def convert_masks_to_rle(pred_masks):
+    """
+    Convert masks to pycoco binary RLE format to reduce size
+    https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/mask.py
+    """
+    
+    pred_masks = pred_masks.cpu()
+    pred_masks_rle = [mask_util.encode(np.asfortranarray(mask)) for mask in pred_masks]
+    
+    for rle in pred_masks_rle:
+        rle['counts'] = rle['counts'].decode('utf-8')
+    
+    return pred_masks_rle
+
+def convert_rle_to_masks(pred_masks_rle):
+    """
+    Convert RLE masks to D2 mask format
+    """
+    return np.stack([mask_util.decode(pred_masks_rle) for rle in v])    
     
     
 if __name__ == "__main__":
