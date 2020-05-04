@@ -314,10 +314,10 @@ def main(sm_args):
         )
 
     do_train(cfg, model, resume=resume)
-    _save_model(model)
+    do_test(cfg, model)
     
-    return do_test(cfg, model)
-    
+    if sm_args.current_host==sm_args.hosts[0]:
+        return _save_model(model)
 
 if __name__ == "__main__":
     
