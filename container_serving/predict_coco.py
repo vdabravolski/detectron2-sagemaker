@@ -2,11 +2,6 @@
 # https://github.com/aws/sagemaker-pytorch-serving-container/blob/master/src/sagemaker_pytorch_serving_container/default_inference_handler.py
 # SM specs: https://sagemaker.readthedocs.io/en/stable/using_pytorch.html
 
-
-# TODO list
-# 1. add support of multi-GPU instances - if GPU devices > 1, do round robin
-# 2. do we need to support checkpoints (optimizers, LR etc.)
-
 import os
 import io
 import argparse
@@ -55,16 +50,7 @@ def _get_predictor(config_path, model_path):
     pred = DefaultPredictor(cfg)
     logger.info(cfg)
     eval_results = pred.model.eval()
-    
-#     pred.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
-#     checkpointer = DetectionCheckpointer(pred.model)
-#     checkpointer.load(cfg.MODEL.WEIGHTS)
-#     pred.transform_gen = T.ResizeShortestEdge([cfg.INPUT.MIN_SIZE_TEST, 
-#                                                cfg.INPUT.MIN_SIZE_TEST], cfg.INPUT.MAX_SIZE_TEST)
 
-#     pred.input_format = cfg.INPUT.FORMAT
-#     assert pred.input_format in ["RGB", "BGR"], pred.input_format
-    
     return pred
 
 
