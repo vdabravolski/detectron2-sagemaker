@@ -15,7 +15,7 @@ Amazon Sagemaker uses docker containers both for training and inference:
 `ENV TORCH_CUDA_ARCH_LIST="Kepler;Kepler+Tesla;Maxwell;Maxwell+Tegra;Pascal;Volta;Turing"`
 
 ## Distributed training on COCO2017 dataset
-See `d2_byoc_coco2017_training.ipynb` for end-to-end example of how to train your Detectron2 model on Sagemaker. Currently implementation supports both multi-node and multi-GPU training on Sagemaker distributed cluster.
+See `d2_byoc_coco2017_training.ipynb` for end-to-end example of how to train your Detectron2 model on Sagemaker. Current implementation supports both multi-node and multi-GPU training on Sagemaker distributed cluster.
 
 ### Training cluster config
 - To define parameters of your distributed training cluster, use Sagemaker Estimator configuration:
@@ -49,8 +49,8 @@ There are 3 ways how you can fine-tune your Detectron2 configuration:
 See `d2_byoc_coco2017_inference.ipynb` notebook with example how to host D2 pre-trained model on Sagemaker Inference endpoint.
 
 ## Future work
-- [] try to export Detectron2 models to Torchscript (not all model architectures are supported today). If succesfful, torchscript models can use Sagemaker Elastic Inference hosting endpoints (fractional GPUs). See `export.md` for current status.
-- [] process video stream using Detecrton2 model hosted on Sagemaker inference endpoint.
+- [ ] try to export Detectron2 models to Torchscript (not all model architectures are supported today). If succesfful, torchscript models can use Sagemaker Elastic Inference hosting endpoints (fractional GPUs). See `export.md` for current status.
+- [ ] process video stream using Detecrton2 model hosted on Sagemaker inference endpoint.
 
 
 
