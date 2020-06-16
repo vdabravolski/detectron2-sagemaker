@@ -54,30 +54,33 @@ Label = namedtuple( 'Label' , [
     ] )
 
 
-# TODO: label ids are likely incorrect.
 labels = [
     #       name                  id    trainId   category            catId     hasInstances   ignoreInEval   color
-    Label(  'tree'               ,  0 ,      0 , 'nature'          , 0       , False        , False        , (  0,  0,  0) ),
-    Label(  'grass'              ,  1 ,      1 , 'nature'          , 0       , False        , True         , (111, 74,  0) ), # TODO: assuming that there is typo in "gras"
-    Label(  'other vegetation'   ,  2 ,      2 , 'nature'          , 0       , False        , True         , ( 81,  0, 81) ),
-    Label(  'dirt'               ,  3 ,      3 , 'flat'            , 1       , False        , True         , (128, 64,128) ),
-    Label(  'gravel'             ,  4 ,      4 , 'flat'            , 1       , False        , True         , (244, 35,232) ),
-    Label(  'rocks'              ,  5 ,      5 , 'flat'            , 1       , False        , True         , (250,170,160) ),
-    Label(  'water'              ,  6 ,      6 , 'flat'            , 1       , False        , False        , (230,150,140) ),
-    Label(  'paved area'         ,  7 ,      7 , 'construction'    , 2       , False        , True         , ( 70, 70, 70) ),
-    Label(  'pool'               ,  8 ,      8 , 'construction'    , 2       , False        , True         , (102,102,156) ),
-    Label(  'person'             ,  9 ,      9 , 'human'           , 3       , True         , False        , (220, 20, 60) ),
-    Label(  'dog'                ,  10 ,    10 , 'animal'          , 4       , True         , False        , (255,  0,  0) ),
-    Label(  'car'                ,  11 ,    11 , 'vehicle'         , 5       , True         , False        , (  0,  0,142) ),
-    Label(  'bicycle'            ,  12 ,    12 , 'vehicle'         , 5       , True         , False        , (  0,  0, 70) ),
-    Label(  'roof'               ,  13 ,    13 , 'construction'    , 2       , False        , False        , (190,153,153) ),
-    Label(  'wall'               ,  14 ,    14 , 'construction'    , 2       , False        , True         , (180,165,180) ),
-    Label(  'fence'              ,  15 ,    15 , 'object'          , 6       , False        , True         , (153,153,153) ),
-    Label(  'fence-pole'         ,  16 ,    16 , 'object'          , 6       , False        , True         , (153,153,150) ),
-    Label(  'window'             ,  17 ,    17 , 'construction'    , 2       , False        , True         , (150,100,100) ),
-    Label(  'door'               ,  18 ,    18 , 'construction'    , 2       , False        , True         , (150,120, 90) ),
-    Label(  'obstacle'           ,  19 ,    19 , 'object'          , 6       , False        , False        , (220,220,  0) ),
+    Label(  'unlabeled'          ,  0 ,      0 , 'unknown'         , 0       , False        , False        , (  0,  0,  0) ),
+    Label(  'paved area'         ,  1 ,      7 , 'flat'            , 2       , False        , True         , ( 128, 64, 128) ),
+    Label(  'dirt'               ,  2 ,      3 , 'flat'            , 1       , False        , True         , (130, 76, 0) ),
+    Label(  'grass'              ,  3 ,      1 , 'nature'          , 0       , False        , True         , (0, 102, 0) ),
+    Label(  'gravel'             ,  4 ,      4 , 'flat'            , 1       , False        , True         , (112, 103, 87) ),
+    Label(  'water'              ,  5 ,      6 , 'flat'            , 1       , False        , False        , (228, 42, 168) ),
+    Label(  'rocks'              ,  6 ,      5 , 'flat'            , 1       , False        , True         , (48, 41, 30) ),
+    Label(  'pool'               ,  7 ,      8 , 'construction'    , 2       , False        , True         , (0, 50, 89) ),
+    Label(  'vegetation'         ,  8 ,      2 , 'nature'          , 0       , False        , True         , ( 107, 142, 35) ),
+    Label(  'roof'               ,  9 ,     13 , 'construction'    , 2       , False        , False        , (70, 70, 70) ),
+    Label(  'wall'               , 10 ,     14 , 'construction'    , 2       , False        , True         , (102, 102, 156) ), 
+    Label(  'window'             , 11 ,     17 , 'construction'    , 2       , False        , True         , (254, 228, 12) ),
+    Label(  'door'               , 12 ,     18 , 'construction'    , 2       , False        , True         , (254, 148, 12) ),
+    Label(  'fence'              , 13 ,     15 , 'object'          , 6       , False        , True         , (190, 153, 153) ),
+    Label(  'fence-pole'         , 15 ,     16 , 'object'          , 6       , False        , True         , (153, 153, 153) ),
+    Label(  'person'             , 14 ,      9 , 'human'           , 3       , True         , False        , (255, 22, 96) ),
+    Label(  'dog'                , 16 ,     10 , 'animal'          , 4       , True         , False        , (102, 51, 0) ),
+    Label(  'car'                , 17 ,     11 , 'vehicle'         , 5       , True         , False        , (9, 143, 150) ),
+    Label(  'bicycle'            , 17 ,     12 , 'vehicle'         , 5       , True         , False        , (119, 11, 32) ),
+    Label(  'tree'               , 19 ,      0 , 'nature'          , 0       , False        , False        , (51, 51, 0) ),
+    Label(  'bald-tree'          , 20 ,      0 , 'nature'          , 0       , False        , False        , ( 190, 250, 190) ),
+    Label(  'ar-marker'          , 21 ,      0 , 'object'          , 0       , False        , False        , ( 112, 150, 146) ),
+    Label(  'obstacle'           , 22 ,     19 , 'object'          , 6       , False        , False        , (2, 135, 115) ),
 ]
+
 
 
 def get_drone_files(image_dir, gt_dir):
@@ -93,9 +96,6 @@ def get_drone_files(image_dir, gt_dir):
         filename = os.path.splitext(file)[0]
         gt_files.append(filename+".png")
 
-    # assert len(image_files) == len(gt_files), f"Number of files in image \
-    #     directory {len(image_files)} is different from number of GT \
-    #     files {len(gt_files)}"
 
     # add file path and combine image and gt files into list of tuples
     combined_files = []
