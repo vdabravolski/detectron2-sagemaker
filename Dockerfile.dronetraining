@@ -1,16 +1,15 @@
 # Build an image of Detectron2 that can do distributing training on Amazon Sagemaker 
 
 # using Sagemaker PyTorch container as base image
-# https://github.com/aws/sagemaker-pytorch-container/blob/master/docker/1.4.0/py3/Dockerfile.gpu
+# from https://github.com/aws/sagemaker-pytorch-container
 FROM 763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-training:1.5.1-gpu-py36-cu101-ubuntu16.04
 LABEL author="vadimd@amazon.com"
 
 ############# Installing latest builds ############
 
-# This is to fix issue: https://github.com/pytorch/vision/issues/1489
 RUN pip install --upgrade --force-reinstall torch torchvision cython
 
-############# D2 section ##############
+############# Detectron2 section ##############
 
 # installing dependecies for D2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
 RUN pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
