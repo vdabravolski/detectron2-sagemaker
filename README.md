@@ -4,11 +4,13 @@ This is not official AWS repository. Code provided "as is".
 This repository implements port of latest [Detectron2](https://github.com/facebookresearch/detectron2/) ("D2") to [Amazon Sagemaker](https://aws.amazon.com/sagemaker/). Scope includes:
 - [x] train Detectron2 models on COCO2017 using Sagemaker distributed training;
 - [x] deploy trained D2 model on Sagemaker Inference endpoint.
+- [x] finetune D2 model on custom dataset using Sagemaker distributed training and hosting.
 
 ## Containers
 Amazon Sagemaker uses docker containers both for training and inference:
 - `Dockerfile` is training container, sources from `container_training` directory will be added at training time;
 - `Dockerfile.serving` is serving container, `container_serving` directory will added at inference time.
+- 'Dockerfile.dronetraining' is a custom training container for custom dataset.
 
 **Note**: by default training container compiles Detectron2 for Volta architecture (Tesla V100 GPUs). If you'd like to run training on other GPU architectures, consider updating this [environment variable](https://github.com/vdabravolski/detectron2-sagemaker/blob/e6252211b819815962207d1a61d5675d213e0f25/Dockerfile#L21). Here is an example on how to compile Detectron2 for all supported architectures:
 
@@ -47,6 +49,9 @@ There are 3 ways how you can fine-tune your Detectron2 configuration:
 
 ## Serving trained D2 model for inference
 See `d2_byoc_coco2017_inference.ipynb` notebook with example how to host D2 pre-trained model on Sagemaker Inference endpoint.
+
+## Training and serving Detectron2 model for custom problem
+See `d2_custom_drone_dataset.ipynb` notebook for details.
 
 ## Future work
 - [ ] try to export Detectron2 models to Torchscript (not all model architectures are supported today). If succesfful, torchscript models can use Sagemaker Elastic Inference hosting endpoints (fractional GPUs). See `export.md` for current status.
