@@ -5,7 +5,7 @@ import logging
 import sys
 import ast
 import json
-import shutil
+from pathlib import Path
 
 from detectron2.engine import launch
 from detectron2.config import get_cfg, CfgNode
@@ -17,10 +17,10 @@ from engine.custom_trainer import Trainer
 ##############
 # Macros
 ##############
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(logging.StreamHandler(sys.stdout))
-
+LOGGER = logging.Logger("TrainingScript", level=logging.INFO)
+HANDLER = logging.StreamHandler(sys.stdout)
+HANDLER.setFormatter(logging.Formatter("%(levelname)s | %(name)s | %(message)s"))
+LOGGER.addHandler(HANDLER)
 
 ########################
 # Implementation Details
@@ -108,14 +108,20 @@ def _train_impl(args) -> None:
     """
 
     dataset = DataSetMeta(name=args.dataset_name, classes=args.classes)
-    LOGGER.info(f"Dataset registered! {dataset}")
+
+    for ds_type in ("training", "validation"):
+        if not Path(args.annotation_channel) / f"{ds_type}.manifest":
+            err_msg = f"{ds_type} dataset annotations not found"
+            LOGGER.error(err_msg)
+            raise FileNotFoundError(err_msg)
+
     register_dataset(
         metadata=dataset,
         label_name=args.label_name,
         training=args.training_channel,
-        train_ann=args.training_annotation_channel,
+        train_ann=f"{args.annotation_channel}/training.manifest",
         validation=args.validation_channel,
-        valid_ann=args.validation_annotation_channel,
+        valid_ann=f"{args.annotation_channel}/validation.manifest",
     )
 
     cfg = _config_training(args)
@@ -135,10 +141,6 @@ def _train_impl(args) -> None:
     if args.current_host == args.hosts[0]:
         with open(f"{cfg.OUTPUT_DIR}/config.json", "w") as fid:
             json.dump(cfg, fid, indent=2)
-
-        code_folder = f"{cfg.OUTPUT_DIR}/code/"
-        os.makedirs(os.path.dirname(code_folder), exist_ok=True)
-        shutil.copy("inference.py", code_folder)
 
 
 ##########
@@ -165,7 +167,7 @@ def train(args: argparse.Namespace) -> None:
 
     launch(
         _train_impl,
-        num_gpus_per_machine=args.num_gpus, # // len(args.hosts),
+        num_gpus_per_machine=args.num_gpus,  # // len(args.hosts),
         num_machines=len(args.hosts),
         dist_url=url,
         machine_rank=machine_rank,
@@ -316,7 +318,7 @@ if __name__ == "__main__":
         "--log-period",
         type=int,
         default=40,
-        help="Occurence in number of iterations at which loss values are logged"
+        help="Occurence in number of iterations at which loss values are logged",
     )
 
     # Inference Parameters
@@ -367,22 +369,16 @@ if __name__ == "__main__":
         help="Path folder that contains training images (File mode)",
     )
     PARSER.add_argument(
-        "--training-annotation-channel",
-        type=str,
-        default=os.environ["SM_CHANNEL_TRAINING_ANNOTATION"],
-        help="Path to folder that contains one JSON annotation file per training image (File mode)",
-    )
-    PARSER.add_argument(
         "--validation-channel",
         type=str,
         default=os.environ["SM_CHANNEL_VALIDATION"],
         help="Path folder that contains validation images (File mode)",
     )
     PARSER.add_argument(
-        "--validation-annotation-channel",
+        "--annotation-channel",
         type=str,
-        default=os.environ["SM_CHANNEL_VALIDATION_ANNOTATION"],
-        help="Path to folder that contains one JSON annotation file per val image (File mode)",
+        default=os.environ["SM_CHANNEL_ANNOTATION"],
+        help="Path to folder that contains augumented manifest files with annotations",
     )
 
     PARSER.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
