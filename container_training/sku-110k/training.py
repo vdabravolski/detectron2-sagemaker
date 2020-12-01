@@ -71,7 +71,6 @@ def _config_training(args: argparse.Namespace) -> CfgNode:
         cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(args.classes)
         cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = args.pred_thr
         cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = args.nms_thr
-        cfg.MODEL.ANCHOR_GENERATOR.SIZES = [[16], [32], [64], [128], [256]]
         cfg.MODEL.RPN.BBOX_REG_LOSS_TYPE = args.reg_loss_type
         cfg.MODEL.RPN.BBOX_REG_LOSS_WEIGHT = args.bbox_reg_loss_weight
         cfg.MODEL.RPN.POSITIVE_FRACTION = args.bbox_rpn_pos_fraction
@@ -83,9 +82,6 @@ def _config_training(args: argparse.Namespace) -> CfgNode:
         cfg.MODEL.RETINANET.BBOX_REG_LOSS_TYPE = args.reg_loss_type
         cfg.MODEL.RETINANET.FOCAL_LOSS_GAMMA = args.focal_loss_gamma
         cfg.MODEL.RETINANET.FOCAL_LOSS_ALPHA = args.focal_loss_alpha
-
-        # TODO: add these options as parameters
-        cfg.MODEL.ANCHOR_GENERATOR.SIZES = [[16, 32, 64, 128, 256]]
     else:
         assert False, f"Add implementation for model {args.model_type}"
     cfg.MODEL.DEVICE = "cuda" if args.num_gpus else "cpu"
