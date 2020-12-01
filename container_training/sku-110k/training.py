@@ -1,4 +1,4 @@
-"""Entry point of the container to be used for SageMaker training of Detectron2 algorithms"""
+"""Entry point of the Detectron2 container that is used to train models on SKU-110k dataset"""
 import os
 import argparse
 import logging
@@ -28,22 +28,24 @@ LOGGER.addHandler(HANDLER)
 
 
 def _config_training(args: argparse.Namespace) -> CfgNode:
-    """
-    Create a configuration node from the script arguments. In this application we consider
-    object detection use case only. We finetune object detection networks trained on COCO dataset
-    to a custom use case
+    r"""Create a configuration node from the script arguments.
 
-    Args:
-        args (argparse.Namespace): script arguments
+    In this application we consider object detection use case only. We finetune object detection
+    networks trained on COCO dataset to a custom use case
 
-    Returns:
-        CfgNode: configuration that is used by Detectron2 to train a model
+    Parameters
+    ----------
+    args : argparse.Namespace
+        training script arguments, see :py:meth:`_parse_args()`
+
+    Returns
+    -------
+    CfgNode
+        configuration that is used by Detectron2 to train a model
 
     Raises:
-        RuntimeError: if the combination of model_type, backbone, lr_schedule is not part of
-            Detectron2's zoo. Please have a look at
-            https://github.com/facebookresearch/detectron2/blob/master/MODEL_ZOO.md
-            if this exception is thrown
+        RuntimeError: if the combination of `model_type`, `backbone`, `lr_schedule` is not valid.
+            Please refer to Detectron2 model zoo for valid options.
     """
     cfg = get_cfg()
     pretrained_model = (
@@ -94,13 +96,12 @@ def _config_training(args: argparse.Namespace) -> CfgNode:
 
 
 def _train_impl(args) -> None:
-    """
-    Training implementation executes the following steps:
+    r"""Training implementation executes the following steps:
 
-    * Register the dataset to Detectron2 catalog
-    * Create the configuration node for training
-    * Run training
-    * Serialize the training configuration to a JSON file, which is required for prediction
+        * Register the dataset to Detectron2 catalog
+        * Create the configuration node for training
+        * Launch training
+        * Serialize the training configuration to a JSON file as it is required for prediction
     """
 
     dataset = DataSetMeta(name=args.dataset_name, classes=args.classes)
@@ -145,11 +146,12 @@ def _train_impl(args) -> None:
 
 
 def train(args: argparse.Namespace) -> None:
-    """
-    Training script uses Detectron2 wrapper 'launch' to simply distribute training
+    r"""Launch distributed training by using Detecton2's `launch()` function
 
-    Args:
-        args (argparse.Namespace): please refer to argument helps for details (python $thisfile - h)
+    Parameters
+    ----------
+    args : argparse.Namespace
+        training script arguments, see :py:meth:`_parse_args()`
     """
     args.classes = ast.literal_eval(args.classes)
 
@@ -163,7 +165,7 @@ def train(args: argparse.Namespace) -> None:
 
     launch(
         _train_impl,
-        num_gpus_per_machine=args.num_gpus,  # // len(args.hosts),
+        num_gpus_per_machine=args.num_gpus,
         num_machines=len(args.hosts),
         dist_url=url,
         machine_rank=machine_rank,
@@ -175,12 +177,20 @@ def train(args: argparse.Namespace) -> None:
 # Script API
 #############
 
-if __name__ == "__main__":
 
-    PARSER = argparse.ArgumentParser()
+def _parse_args() -> argparse.Namespace:
+    r"""Define training script API according to the argument that are parsed from the CLI
+
+    Returns
+    -------
+    argparse.Namespace
+        training script arguments, execute $(python $thisfile --help) for detailed documentation
+    """
+
+    parser = argparse.ArgumentParser()
 
     # Pretrained model
-    PARSER.add_argument(
+    parser.add_argument(
         "--model-type",
         type=str,
         default="faster_rcnn",
@@ -192,7 +202,7 @@ if __name__ == "__main__":
             "(default: faster_rcnn)"
         ),
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--backbone",
         type=str,
         default="R_50_C4",
@@ -217,7 +227,7 @@ if __name__ == "__main__":
             "(default: R_50_C4)"
         ),
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--lr-schedule",
         type=int,
         default=1,
@@ -231,42 +241,42 @@ if __name__ == "__main__":
         ),
     )
     # Hyper-parameters
-    PARSER.add_argument(
+    parser.add_argument(
         "--num-workers",
         type=int,
         default=2,
         metavar="NW",
         help="Number of workers used to by the data loader (default: 2)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--lr",
         type=float,
         default=0.00025,
         metavar="LR",
         help="Base learning rate value (default: 0.00025)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--num-iter",
         type=int,
         default=1000,
         metavar="I",
         help="Maximum number of iterations (default: 1000)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=16,
         metavar="B",
         help="Number of images per batch across all machines (default: 16)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--num-rpn",
         type=int,
         default=100,
         metavar="R",
         help="Total number of RPN examples per image (default: 100)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--reg-loss-type",
         type=str,
         default="smooth_l1",
@@ -276,14 +286,14 @@ if __name__ == "__main__":
     )
 
     # RetinaNet Specific
-    PARSER.add_argument(
+    parser.add_argument(
         "--focal-loss-gamma",
         type=float,
         default=2.0,
         metavar="FLG",
         help="Focal loss gamma, used in RetinaNet (default: 2.0)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--focal-loss-alpha",
         type=float,
         default=0.25,
@@ -292,25 +302,28 @@ if __name__ == "__main__":
     )
 
     # Faster-RCNN Specific
-    PARSER.add_argument(
+    parser.add_argument(
         "--bbox-reg-loss-weight",
         type=float,
         default=1.0,
         help="Weight regression loss (default: 0.1)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--bbox-rpn-pos-fraction",
         type=float,
         default=0.5,
         help="Target fraction of foreground (positive) examples per RPN minibatch (default: 0.5)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--bbox-head-pos-fraction",
         type=float,
         default=0.25,
-        help="Target fraction of RoI minibatch that is labeled foreground (i.e. class > 0) (default: 0.25)",
+        help=(
+            "Target fraction of RoI minibatch that is labeled foreground (i.e. class > 0) "
+            "(default: 0.25)"
+        ),
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--log-period",
         type=int,
         default=40,
@@ -318,14 +331,14 @@ if __name__ == "__main__":
     )
 
     # Inference Parameters
-    PARSER.add_argument(
+    parser.add_argument(
         "--det-per-img",
         type=int,
         default=200,
         metavar="R",
         help="Maximum number of detections to return per image during inference (default: 200)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--nms-thr",
         type=float,
         default=0.5,
@@ -333,7 +346,7 @@ if __name__ == "__main__":
         help="If IoU is bigger than this value, only more confident pred is kept "
         "(default: 0.5)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--pred-thr",
         type=float,
         default=0.5,
@@ -342,13 +355,13 @@ if __name__ == "__main__":
     )
 
     # Mandatory parameters
-    PARSER.add_argument(
+    parser.add_argument(
         "--classes", type=str, metavar="C", help="List of classes of objects"
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--dataset-name", type=str, metavar="DS", help="Name of the dataset"
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--label-name",
         type=str,
         metavar="DS",
@@ -356,33 +369,36 @@ if __name__ == "__main__":
     )
 
     # Container Environment
-    PARSER.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
+    parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
 
-    PARSER.add_argument(
+    parser.add_argument(
         "--training-channel",
         type=str,
         default=os.environ["SM_CHANNEL_TRAINING"],
         help="Path folder that contains training images (File mode)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--validation-channel",
         type=str,
         default=os.environ["SM_CHANNEL_VALIDATION"],
         help="Path folder that contains validation images (File mode)",
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--annotation-channel",
         type=str,
         default=os.environ["SM_CHANNEL_ANNOTATION"],
         help="Path to folder that contains augumented manifest files with annotations",
     )
 
-    PARSER.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
-    PARSER.add_argument(
+    parser.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
+    parser.add_argument(
         "--hosts", type=str, default=ast.literal_eval(os.environ["SM_HOSTS"])
     )
-    PARSER.add_argument(
+    parser.add_argument(
         "--current-host", type=str, default=os.environ["SM_CURRENT_HOST"]
     )
+    return parser.parse_args()
 
-    train(PARSER.parse_args())
+
+if __name__ == "__main__":
+    train(_parse_args())

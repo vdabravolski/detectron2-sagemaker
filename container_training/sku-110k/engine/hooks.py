@@ -1,16 +1,40 @@
 """Implementation of Hooks to be used in training loop"""
+from typing import Sequence
+
 import torch
 from detectron2.engine.hooks import HookBase
 from detectron2.data import (
-    # build_detection_test_loader,
     build_detection_train_loader,
     DatasetMapper,
 )
 from detectron2.utils import comm
-
+from detectron2.config import CfgNode
+from detectron2.data.transforms import Augmentation
 
 class ValidationLoss(HookBase):
-    def __init__(self, cfg, val_augmentation, period: int = 40):
+    r"""Hook that computes validation loss during training
+
+    Parameters
+    ----------
+    cfg : CfgNode
+        Training configuration
+    val_augmentation : Sequence[Augmentation]
+        Data augmentation functions applied to validation data
+    period : int
+        The validation loss values are updated each `period` iterations
+
+    Attributes
+    ----------
+    cfg : CfgNode
+        Clone of `cfg` parameters
+    _loader : detectron2.data.DataLoader
+        Validation data loader
+    _period : int
+        See `period` parameter
+    num_steps : int
+        It keeps track of the current iteration id
+    """
+    def __init__(self, cfg: CfgNode, val_augmentation: Sequence[Augmentation], period: int):
         super().__init__()
         self.cfg = cfg.clone()
         self.cfg.DATASETS.TRAIN = cfg.DATASETS.TEST
@@ -26,6 +50,7 @@ class ValidationLoss(HookBase):
         self.num_steps = 0
 
     def after_step(self):
+        """Run after every iteration, see parent for details"""
         self.num_steps += 1
         if self.num_steps % self._period == 0:
             data = next(self._loader)

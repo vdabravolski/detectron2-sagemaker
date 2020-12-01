@@ -1,6 +1,4 @@
 """Implementation of custom trainer"""
-import os
-
 from detectron2.engine import DefaultTrainer
 from detectron2.data import (
     build_detection_test_loader,
@@ -9,7 +7,6 @@ from detectron2.data import (
 )
 from detectron2.config import CfgNode
 import detectron2.data.transforms as T
-from detectron2.evaluation import COCOEvaluator, DatasetEvaluators
 from detectron2.utils import comm
 from detectron2.engine import hooks
 from detectron2.utils.events import CommonMetricPrinter
@@ -18,25 +15,12 @@ from engine.hooks import ValidationLoss
 
 ########################################################
 # MACROs that define training and validation transforms
-#! this shoud be passed as argument on the final dataset
 ########################################################
 
 TRAIN_TRANSF = [
     T.ResizeShortestEdge(
-        short_edge_length=(800,),
-        max_size=1333,
-        sample_style="choice",
+        short_edge_length=(800,), max_size=1333, sample_style="choice",
     ),
-    # T.RandomFlip(),
-    # T.RandomApply(
-    #     transform=T.RandomBrightness(intensity_min=0.75, intensity_max=1.25), prob=0.50
-    # ),
-    # T.RandomApply(
-    #     transform=T.RandomContrast(intensity_min=0.76, intensity_max=1.25), prob=0.50
-    # ),
-    # T.RandomApply(
-    #     transform=T.RandomSaturation(intensity_min=0.75, intensity_max=1.25), prob=0.50
-    # ),
 ]
 VAL_TRANSF = [
     T.ResizeShortestEdge(short_edge_length=(800,), max_size=1333, sample_style="choice")
@@ -47,11 +31,12 @@ VAL_TRANSF = [
 
 
 class Trainer(DefaultTrainer):
-    """
-    Use a custom trainer. The main differences compared with DefaultTrainer are:
+    r""" Use a custom trainer
 
-    * Use custom transforms rather than default ones defined in the config
-    * Implement the build_evaluator to run evaluation on the validation datasets
+    The main differences compared with DefaultTrainer are:
+
+        * Use custom transforms rather than default ones defined in the config
+        * Use custom hooks
     """
 
     @classmethod
@@ -71,13 +56,15 @@ class Trainer(DefaultTrainer):
             mapper=DatasetMapper(cfg, is_train=True, augmentations=TRAIN_TRANSF),
         )
 
-    def build_hooks(self):
-        """
-        Build a list of default hooks, including timing, evaluation,
-        checkpointing, lr scheduling, precise BN, writing events.
+    @classmethod
+    def build_evaluator(cls, cfg, dataset_name):
+        r"""Use Validation loss for evaluation+. Coco evaluation is executed outside of training"""
+        return None
 
-        Returns:
-            list[HookBase]:
+    def build_hooks(self):
+        r"""Build hooks
+
+        We use: timing, lr scheduling, checkpointing, lr scheduling, ValidationLoss, writing events
         """
         cfg = self.cfg.clone()
         cfg.defrost()
@@ -93,16 +80,23 @@ class Trainer(DefaultTrainer):
         # This is not always the best: if checkpointing has a different frequency,
         # some checkpoints may have more precise statistics than others.
         if comm.is_main_process():
-            ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
+            ret.append(
+                hooks.PeriodicCheckpointer(
+                    self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD
+                )
+            )
 
         ret.append(ValidationLoss(cfg, VAL_TRANSF, cfg.VAL_LOG_PERIOD))
 
         if comm.is_main_process():
             # run writers in the end, so that evaluation metrics are written
-            ret.append(hooks.PeriodicWriter(self.build_writers(), period=cfg.VAL_LOG_PERIOD))
+            ret.append(
+                hooks.PeriodicWriter(self.build_writers(), period=cfg.VAL_LOG_PERIOD)
+            )
         return ret
 
     def build_writers(self):
+        r"""Metric to print. This is used by `PeriodicWriter` hook"""
         return [
             CommonMetricPrinter(self.cfg.SOLVER.MAX_ITER),
         ]

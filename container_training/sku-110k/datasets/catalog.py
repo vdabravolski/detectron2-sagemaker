@@ -1,4 +1,4 @@
-"""Manage Grocery Store dataset"""
+"""Add to Detectron2 catalog SKU-110k dataset"""
 from typing import Sequence, Mapping
 from pathlib import Path
 import json
@@ -18,12 +18,14 @@ LOGGER.addHandler(HANDLER)
 
 @dataclass
 class DataSetMeta:
-    """
-    Dataset metadata
+    r"""Dataset metadata
 
-    Attributes:
-        name (str): dataset name
-        classes (Sequence[str]): class of objects to detect
+    Attributes
+    ----------
+        name : str
+            dataset name
+        classes : Sequence[str]
+            class of objects to detect
     """
 
     name: str
@@ -39,7 +41,13 @@ class DataSetMeta:
 
 
 def remove_dataset(ds_name: str):
-    """Remove a previously registered data store """
+    r"""Remove a previously registered dataset
+
+    Parameters
+    ----------
+    ds_name : str
+        the dataset to be removed
+    """
     for channel in ("training", "validation"):
         DatasetCatalog.remove(f"{ds_name}_{channel}")
 
@@ -87,7 +95,7 @@ def aws_file_mode(
             local_path_to_img = Path(path_imgs) / path_s3_img.name
             if not local_path_to_img.exists():
                 LOGGER.warning(
-                    f"{path_s3_img.name} not found in image channel, annotation is going to be neglected"
+                    f"{path_s3_img.name} not found in image channel: annotations are neglected"
                 )
                 continue
 
@@ -118,6 +126,7 @@ def aws_file_mode(
     return dataset_dicts
 
 
+# pylint: disable=too-many-arguments
 def register_dataset(
     metadata: DataSetMeta,
     label_name: str,
@@ -126,20 +135,29 @@ def register_dataset(
     validation: str,
     valid_ann: str,
 ) -> Metadata:
-    """
-    Register a training dataset to detectron2
+    r"""Register training and validation datasets to detectron2
 
-    Args:
-        metadata (DataSetMeta): metadata of the datasets to register
-        label_name (str): label name used for object detection GT job
-        training (str): path to training images
-        train_ann (str): path to training annotations
-        validation (str): path to validation images
-        valid_ann (str): path to validation annotations
+    Parameters
+    ----------
+    metadata : DataSetMeta
+        metadata of the datasets to register
+    label_name : str
+        label name used for object detection GT job
+    training : str
+        path to training images
+    train_ann : str
+        path to training annotations
+    validation : str
+        path to validation images
+    valid_ann : str
+        path to validation annotations
 
-    Returns:
-        Metadata: Detectron2 metadata file
+    Returns
+    -------
+    Metadata
+        Metadata file
     """
+
     channels = {
         "training": (training, train_ann),
         "validation": (validation, valid_ann),
