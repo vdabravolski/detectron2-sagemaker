@@ -1,5 +1,5 @@
 """Add to Detectron2 catalog SKU-110k dataset"""
-from typing import Sequence, Mapping
+from typing import Sequence, Mapping, Tuple
 from pathlib import Path
 import json
 from functools import partial
@@ -130,10 +130,7 @@ def aws_file_mode(
 def register_dataset(
     metadata: DataSetMeta,
     label_name: str,
-    training: str,
-    train_ann: str,
-    validation: str,
-    valid_ann: str,
+    channel_to_dataset: Mapping[str, Tuple[str, str]],
 ) -> Metadata:
     r"""Register training and validation datasets to detectron2
 
@@ -143,14 +140,9 @@ def register_dataset(
         metadata of the datasets to register
     label_name : str
         label name used for object detection GT job
-    training : str
-        path to training images
-    train_ann : str
-        path to training annotations
-    validation : str
-        path to validation images
-    valid_ann : str
-        path to validation annotations
+    channel_to_dataset: Mapping[str, Tuple[str, str]]
+        map channel name to dataset, each dataset is a 2D-tuple that contains path to images and
+        path to augmented manifest file 
 
     Returns
     -------
@@ -158,12 +150,7 @@ def register_dataset(
         Metadata file
     """
 
-    channels = {
-        "training": (training, train_ann),
-        "validation": (validation, valid_ann),
-    }
-
-    for channel, datasets in channels.items():
+    for channel, datasets in channel_to_dataset.items():
         detectron_ds_name = f"{metadata.name}_{channel}"
         DatasetCatalog.register(
             detectron_ds_name,
@@ -171,4 +158,4 @@ def register_dataset(
         )
         MetadataCatalog.get(detectron_ds_name).set(thing_classes=metadata.classes)
         LOGGER.info(f"{detectron_ds_name} dataset added to catalog")
-    return MetadataCatalog.get(f"{metadata.name}_training")
+    return MetadataCatalog.get(f"{metadata.name}_{list(channel_to_dataset.keys())[0]}")

@@ -112,13 +112,19 @@ def _train_impl(args) -> None:
             LOGGER.error(err_msg)
             raise FileNotFoundError(err_msg)
 
+    channel_to_ds = {
+        "training": (
+            args.training_channel,
+            f"{args.annotation_channel}/training.manifest",
+        ),
+        "validation": (
+            args.validation_channel,
+            f"{args.annotation_channel}/validation.manifest",
+        ),
+    }
+
     register_dataset(
-        metadata=dataset,
-        label_name=args.label_name,
-        training=args.training_channel,
-        train_ann=f"{args.annotation_channel}/training.manifest",
-        validation=args.validation_channel,
-        valid_ann=f"{args.annotation_channel}/validation.manifest",
+        metadata=dataset, label_name=args.label_name, channel_to_dataset=channel_to_ds,
     )
 
     cfg = _config_training(args)
