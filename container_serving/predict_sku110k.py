@@ -1,9 +1,9 @@
 """Code used for sagemaker batch transform jobs"""
-import os
 from typing import BinaryIO, Mapping
 import json
 import logging
 import sys
+from pathlib import Path
 
 import numpy as np
 import cv2
@@ -16,9 +16,10 @@ from detectron2.config import CfgNode
 # Macros
 ##############
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(logging.StreamHandler(sys.stdout))
+LOGGER = logging.Logger("InferenceScript", level=logging.INFO)
+HANDLER = logging.StreamHandler(sys.stdout)
+HANDLER.setFormatter(logging.Formatter("%(levelname)s | %(name)s | %(message)s"))
+LOGGER.addHandler(HANDLER)
 
 ##########
 # Deploy
@@ -29,56 +30,91 @@ def _load_from_bytearray(request_body: BinaryIO) -> np.ndarray:
 
 
 def model_fn(model_dir: str) -> DefaultPredictor:
-    """
-    Load trained model
+    r"""Load trained model
 
-    Args:
-        model_dir (str): S3 location of the model directory
+    Parameters
+    ----------
+    model_dir : str
+        S3 location of the model directory
 
-    Returns:
-        nn.Module: trained PyTorch model
+    Returns
+    -------
+    DefaultPredictor
+        PyTorch model created by using Detectron2 API
     """
-    with open(os.path.join(model_dir, "config.json")) as fid:
+    path_cfg, path_model = None, None
+    for p_file in Path(model_dir).iterdir():
+        if p_file.suffix == ".json":
+            path_cfg = p_file
+        if p_file.suffix == ".pth":
+            path_model = p_file
+
+    LOGGER.info(f"Using configuration specified in {path_cfg}")
+    LOGGER.info(f"Using model saved at {path_model}")
+
+    if path_model is None:
+        err_msg = "Missing model PTH file"
+        LOGGER.error(err_msg)
+        raise RuntimeError(err_msg)
+    if path_cfg is None:
+        err_msg = "Missing configuration JSON file"
+        LOGGER.error(err_msg)
+        raise RuntimeError(err_msg)
+
+    with open(str(path_cfg)) as fid:
         cfg = CfgNode(json.load(fid))
 
-    cfg.MODEL.WEIGHTS = os.path.join(model_dir, "model_final.pth")
+    cfg.MODEL.WEIGHTS = str(path_model)
     cfg.MODEL.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     return DefaultPredictor(cfg)
 
 
 def input_fn(request_body: BinaryIO, request_content_type: str) -> np.ndarray:
-    """
-    Parse input data
+    r"""Parse input data
 
-    Args:
-        request_body (BinaryIO): encoded input image
-        request_content_type (str): type of content
+    Parameters
+    ----------
+    request_body : BinaryIO
+        encoded input image
+    request_content_type : str
+        type of content
 
-    Raises:
-        ValueError: ValueError if the content type is not 'application/x-image'
+    Returns
+    -------
+    np.ndarray
+        input image
 
-    Returns:
-        torch.Tensor: input image Tensor
+    Raises
+    ------
+    ValueError
+        ValueError if the content type is not `application/x-image`
     """
     if request_content_type == "application/x-image":
         np_image = _load_from_bytearray(request_body)
     else:
-        raise ValueError(f"Type [{request_content_type}] not support this type yet")
+        err_msg = f"Type [{request_content_type}] not support this type yet"
+        LOGGER.error(err_msg)
+        raise ValueError(err_msg)
     return np_image
 
 
 def predict_fn(input_object: np.ndarray, predictor: DefaultPredictor) -> Mapping:
-    """
-    Run Detectron2 prediction
+    r"""Run Detectron2 prediction
 
-    Args:
-        input_object (np.ndarray): input image
-        predictor (DefaultPredictor): Detectron2 default predictor (see Detectron2 documentation
-            for details)
+    Parameters
+    ----------
+    input_object : np.ndarray
+        input image
+    predictor : DefaultPredictor
+        Detectron2 default predictor (see Detectron2 documentation for details)
 
-    Returns:
-        [Mapping]: a dictionary that contains absolute
+    Returns
+    -------
+    Mapping
+        a dictionary that contains: the image shape (`image_height`, `image_width`), the predicted
+        bounding boxes in format x1y1x2y2 (`pred_boxes`), the confidence scores (`scores`) and the
+        labels associated with the bounding boxes (`pred_boxes`)
     """
     LOGGER.info(f"Prediction on image of shape {input_object.shape}")
     outputs = predictor(input_object)
@@ -95,5 +131,5 @@ def predict_fn(input_object: np.ndarray, predictor: DefaultPredictor) -> Mapping
 
 # pylint: disable=unused-argument
 def output_fn(predictions, response_content_type):
-    """Serialize the prediction result into the desired response content type"""
+    r"""Serialize the prediction result into the desired response content type"""
     return json.dumps(predictions)
