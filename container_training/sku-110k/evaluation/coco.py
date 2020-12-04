@@ -36,23 +36,23 @@ class EvaluateObjectDetection(COCOeval):
             mind = [i for i, mDet in enumerate(params.maxDets) if mDet == max_dets]
             if use_ap:
                 # dimension of precision: [TxRxKxAxM]
-                s = self.eval["precision"]
+                metric_val = self.eval["precision"]
                 # IoU
                 if iou_thr is not None:
-                    t = np.where(iou_thr == params.iouThrs)[0]
-                    s = s[t]
-                s = s[:, :, :, aind, mind]
+                    metric_id = np.where(iou_thr == params.iouThrs)[0]
+                    metric_val = metric_val[metric_id]
+                metric_val = metric_val[:, :, :, aind, mind]
             else:
                 # dimension of recall: [TxKxAxM]
-                s = self.eval["recall"]
+                metric_val = self.eval["recall"]
                 if iou_thr is not None:
-                    t = np.where(iou_thr == params.iouThrs)[0]
-                    s = s[t]
-                s = s[:, :, aind, mind]
-            if len(s[s > -1]) == 0:
+                    metric_id = np.where(iou_thr == params.iouThrs)[0]
+                    metric_val = metric_val[metric_id]
+                metric_val = metric_val[:, :, aind, mind]
+            if len(metric_val[metric_val > -1]) == 0:
                 mean_s = -1
             else:
-                mean_s = np.mean(s[s > -1])
+                mean_s = np.mean(metric_val[metric_val > -1])
             print(
                 out_str.format(title_str, type_str, iou_str, area_rng, max_dets, mean_s)
             )
@@ -95,9 +95,10 @@ class EvaluateObjectDetection(COCOeval):
 
 
 class FastEvaluateObjectDetection(EvaluateObjectDetection):
-    """
-    This is a slightly modified version of the original COCO API, where the functions evaluateImg()
-    and accumulate() are implemented in C++ to speedup evaluation
+    r"""This class is the same as Detecron2's `COCOeval_opt`
+
+    The only change is that this class inherits from `EvaluateObjectDetection` instead that from
+    COCOeval
     """
 
     def evaluate(self):
@@ -111,40 +112,40 @@ class FastEvaluateObjectDetection(EvaluateObjectDetection):
         tic = time.time()
 
         print("Running per image evaluation...")
-        p = self.params
+        params = self.params
         # add backward compatibility if useSegm is specified in params
-        if p.useSegm is not None:
-            p.iouType = "segm" if p.useSegm == 1 else "bbox"
+        if params.useSegm is not None:
+            params.iouType = "segm" if params.useSegm == 1 else "bbox"
             print(
                 "useSegm (deprecated) is not None. Running {} evaluation".format(
-                    p.iouType
+                    params.iouType
                 )
             )
-        print("Evaluate annotation type *{}*".format(p.iouType))
-        p.imgIds = list(np.unique(p.imgIds))
-        if p.useCats:
-            p.catIds = list(np.unique(p.catIds))
-        p.maxDets = sorted(p.maxDets)
-        self.params = p
+        print("Evaluate annotation type *{}*".format(params.iouType))
+        params.imgIds = list(np.unique(params.imgIds))
+        if params.useCats:
+            params.catIds = list(np.unique(params.catIds))
+        params.maxDets = sorted(params.maxDets)
+        self.params = params
 
         self._prepare()
 
         # loop through images, area range, max detection number
-        catIds = p.catIds if p.useCats else [-1]
+        cat_ids = params.catIds if params.useCats else [-1]
 
-        if p.iouType == "segm" or p.iouType == "bbox":
-            computeIoU = self.computeIoU
-        elif p.iouType == "keypoints":
-            computeIoU = self.computeOks
+        if params.iouType == "segm" or params.iouType == "bbox":
+            compute_IoU = self.computeIoU
+        elif params.iouType == "keypoints":
+            compute_IoU = self.computeOks
         else:
-            assert False, f"Add implementation for {p.iouType}"
+            assert False, f"Add implementation for {params.iouType}"
         self.ious = {
-            (imgId, catId): computeIoU(imgId, catId)
-            for imgId in p.imgIds
-            for catId in catIds
+            (imgId, catId): compute_IoU(imgId, catId)
+            for imgId in params.imgIds
+            for catId in cat_ids
         }
 
-        maxDet = p.maxDets[-1]
+        maxDet = params.maxDets[-1]
 
         # <<<< Beginning of code differences with original COCO API
         def convert_instances_to_cpp(instances, is_det=False):
@@ -164,19 +165,19 @@ class FastEvaluateObjectDetection(EvaluateObjectDetection):
 
         # Convert GT annotations, detections, and IOUs to a format that's fast to access in C++
         ground_truth_instances = [
-            [convert_instances_to_cpp(self._gts[imgId, catId]) for catId in p.catIds]
-            for imgId in p.imgIds
+            [convert_instances_to_cpp(self._gts[imgId, catId]) for catId in params.catIds]
+            for imgId in params.imgIds
         ]
         detected_instances = [
             [
                 convert_instances_to_cpp(self._dts[imgId, catId], is_det=True)
-                for catId in p.catIds
+                for catId in params.catIds
             ]
-            for imgId in p.imgIds
+            for imgId in params.imgIds
         ]
-        ious = [[self.ious[imgId, catId] for catId in catIds] for imgId in p.imgIds]
+        ious = [[self.ious[imgId, catId] for catId in cat_ids] for imgId in params.imgIds]
 
-        if not p.useCats:
+        if not params.useCats:
             # For each image, flatten per-category lists into a single list
             ground_truth_instances = [
                 [[o for c in i for o in c]] for i in ground_truth_instances
@@ -187,9 +188,9 @@ class FastEvaluateObjectDetection(EvaluateObjectDetection):
 
         # Call C++ implementation of self.evaluateImgs()
         self._evalImgs_cpp = _C.COCOevalEvaluateImages(
-            p.areaRng,
+            params.areaRng,
             maxDet,
-            p.iouThrs,
+            params.iouThrs,
             ious,
             ground_truth_instances,
             detected_instances,
@@ -231,7 +232,7 @@ class FastEvaluateObjectDetection(EvaluateObjectDetection):
 
 
 class D2CocoEvaluator(COCOEvaluator):
-    r"""TODO"""
+    r"""Detectron2 COCO evaluator that allows setting the maximum number of detections"""
 
     def __init__(
         self,

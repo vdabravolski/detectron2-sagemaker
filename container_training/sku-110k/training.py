@@ -108,7 +108,11 @@ def _train_impl(args) -> None:
 
     dataset = DataSetMeta(name=args.dataset_name, classes=args.classes)
 
-    for ds_type in ("training", "validation", "test"):
+    for ds_type in (
+        ("training", "validation", "test")
+        if args.evaluation_type
+        else ("training", "validation",)
+    ):
         if not Path(args.annotation_channel) / f"{ds_type}.manifest":
             err_msg = f"{ds_type} dataset annotations not found"
             LOGGER.error(err_msg)
@@ -123,8 +127,12 @@ def _train_impl(args) -> None:
             args.validation_channel,
             f"{args.annotation_channel}/validation.manifest",
         ),
-        "test": (args.test_channel, f"{args.annotation_channel}/test.manifest"),
     }
+    if args.evaluation_type:
+        channel_to_ds["test"] = (
+            args.test_channel,
+            f"{args.annotation_channel}/test.manifest",
+        )
 
     register_dataset(
         metadata=dataset, label_name=args.label_name, channel_to_dataset=channel_to_ds,
@@ -148,18 +156,23 @@ def _train_impl(args) -> None:
         with open(f"{cfg.OUTPUT_DIR}/config.json", "w") as fid:
             json.dump(cfg, fid, indent=2)
 
-        evaluator = D2CocoEvaluator(
-            dataset_name=f"{dataset.name}_test",
-            tasks=("bbox",),
-            distributed=args.num_gpus > 1,
-            output_dir=f"{cfg.OUTPUT_DIR}/eval",
-            use_fast_impl = True,
-            nb_max_preds=cfg.TEST.DETECTIONS_PER_IMAGE,
-        )
-        cfg.DATASETS.TEST = (f"{args.dataset_name}_test",)
-        model = Trainer.build_model(cfg)
-        DetectionCheckpointer(model).load(f"{cfg.OUTPUT_DIR}/model_final.pth")
-        Trainer.test(cfg, model, evaluator)
+        if args.evaluation_type:
+            LOGGER.info(f"Running {args.evaluation_type} evaluation on the test set")
+            evaluator = D2CocoEvaluator(
+                dataset_name=f"{dataset.name}_test",
+                tasks=("bbox",),
+                distributed=args.num_gpus > 1,
+                output_dir=f"{cfg.OUTPUT_DIR}/eval",
+                use_fast_impl=True,
+                nb_max_preds=cfg.TEST.DETECTIONS_PER_IMAGE,
+            )
+            cfg.DATASETS.TEST = (f"{args.dataset_name}_test",)
+            model = Trainer.build_model(cfg)
+            DetectionCheckpointer(model).load(f"{cfg.OUTPUT_DIR}/model_final.pth")
+            Trainer.test(cfg, model, evaluator)
+        else:
+            LOGGER.info("Evaluation on the test set skipped")
+
 
 ##########
 # Training
@@ -198,7 +211,7 @@ def train(args: argparse.Namespace) -> None:
 # Script API
 #############
 
-# TODO add arg `evaluation_type` ("fast", "coco", "none") or default to None
+
 def _parse_args() -> argparse.Namespace:
     r"""Define training script API according to the argument that are parsed from the CLI
 
@@ -373,6 +386,18 @@ def _parse_args() -> argparse.Namespace:
         default=0.5,
         metavar="PT",
         help="Minimum confidence score to retain prediction (default: 0.5)",
+    )
+    parser.add_argument(
+        "--evaluation-type",
+        choices=["fast", "coco"],
+        type=str,
+        default=None,
+        help=(
+            "Evaluation to run on the test set after the training loop on the test. "
+            "Valid options are: `fast` (Detectron2 boosted COCO eval) and "
+            "`coco` (default COCO evaluation). "
+            "This value is by default None, which means that no evaluation is executed"
+        ),
     )
 
     # Mandatory parameters
