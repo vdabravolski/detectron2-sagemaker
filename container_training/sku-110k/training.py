@@ -10,9 +10,11 @@ from pathlib import Path
 from detectron2.engine import launch
 from detectron2.config import get_cfg, CfgNode
 from detectron2 import model_zoo
+from detectron2.checkpoint import DetectionCheckpointer
 
 from datasets.catalog import register_dataset, DataSetMeta
 from engine.custom_trainer import Trainer
+from evaluation.coco import D2CocoEvaluator
 
 ##############
 # Macros
@@ -106,7 +108,7 @@ def _train_impl(args) -> None:
 
     dataset = DataSetMeta(name=args.dataset_name, classes=args.classes)
 
-    for ds_type in ("training", "validation"):
+    for ds_type in ("training", "validation", "test"):
         if not Path(args.annotation_channel) / f"{ds_type}.manifest":
             err_msg = f"{ds_type} dataset annotations not found"
             LOGGER.error(err_msg)
@@ -121,6 +123,7 @@ def _train_impl(args) -> None:
             args.validation_channel,
             f"{args.annotation_channel}/validation.manifest",
         ),
+        "test": (args.test_channel, f"{args.annotation_channel}/test.manifest"),
     }
 
     register_dataset(
@@ -140,11 +143,23 @@ def _train_impl(args) -> None:
         raise err
     trainer.train()
 
-    # Save only if in master process
+    # If in the master process: save config and run evaluation on test set
     if args.current_host == args.hosts[0]:
         with open(f"{cfg.OUTPUT_DIR}/config.json", "w") as fid:
             json.dump(cfg, fid, indent=2)
 
+        evaluator = D2CocoEvaluator(
+            dataset_name=f"{dataset.name}_test",
+            tasks=("bbox",),
+            distributed=args.num_gpus > 1,
+            output_dir=f"{cfg.OUTPUT_DIR}/eval",
+            use_fast_impl = True,
+            nb_max_preds=cfg.TEST.DETECTIONS_PER_IMAGE,
+        )
+        cfg.DATASETS.TEST = (f"{args.dataset_name}_test",)
+        model = Trainer.build_model(cfg)
+        DetectionCheckpointer(model).load(f"{cfg.OUTPUT_DIR}/model_final.pth")
+        Trainer.test(cfg, model, evaluator)
 
 ##########
 # Training
@@ -183,7 +198,7 @@ def train(args: argparse.Namespace) -> None:
 # Script API
 #############
 
-
+# TODO add arg `evaluation_type` ("fast", "coco", "none") or default to None
 def _parse_args() -> argparse.Namespace:
     r"""Define training script API according to the argument that are parsed from the CLI
 
@@ -388,6 +403,15 @@ def _parse_args() -> argparse.Namespace:
         type=str,
         default=os.environ["SM_CHANNEL_VALIDATION"],
         help="Path folder that contains validation images (File mode)",
+    )
+    parser.add_argument(
+        "--test-channel",
+        type=str,
+        default=os.environ["SM_CHANNEL_TEST"],
+        help=(
+            "Path folder that contains test images, "
+            "these are used to evaluate the model but not to drive hparam tuning"
+        ),
     )
     parser.add_argument(
         "--annotation-channel",
