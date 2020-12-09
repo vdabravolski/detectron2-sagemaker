@@ -163,7 +163,7 @@ def _train_impl(args) -> None:
                 tasks=("bbox",),
                 distributed=args.num_gpus > 1,
                 output_dir=f"{cfg.OUTPUT_DIR}/eval",
-                use_fast_impl=True,
+                use_fast_impl=args.evaluation_type == "fast",
                 nb_max_preds=cfg.TEST.DETECTIONS_PER_IMAGE,
             )
             cfg.DATASETS.TEST = (f"{args.dataset_name}_test",)
