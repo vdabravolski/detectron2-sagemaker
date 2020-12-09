@@ -165,7 +165,10 @@ class FastEvaluateObjectDetection(EvaluateObjectDetection):
 
         # Convert GT annotations, detections, and IOUs to a format that's fast to access in C++
         ground_truth_instances = [
-            [convert_instances_to_cpp(self._gts[imgId, catId]) for catId in params.catIds]
+            [
+                convert_instances_to_cpp(self._gts[imgId, catId])
+                for catId in params.catIds
+            ]
             for imgId in params.imgIds
         ]
         detected_instances = [
@@ -175,7 +178,9 @@ class FastEvaluateObjectDetection(EvaluateObjectDetection):
             ]
             for imgId in params.imgIds
         ]
-        ious = [[self.ious[imgId, catId] for catId in cat_ids] for imgId in params.imgIds]
+        ious = [
+            [self.ious[imgId, catId] for catId in cat_ids] for imgId in params.imgIds
+        ]
 
         if not params.useCats:
             # For each image, flatten per-category lists into a single list

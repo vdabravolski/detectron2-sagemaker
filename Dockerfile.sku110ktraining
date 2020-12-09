@@ -6,7 +6,7 @@ FROM 763104351884.dkr.ecr.eu-west-1.amazonaws.com/pytorch-training:1.6.0-gpu-py3
 
 
 ############# Detectron2 pre-built binaries Pytorch default install ############
-RUN conda install --force-reinstall pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
+RUN pip install --upgrade torch==1.6.0+cu101 torchvision==0.7.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
 
 ############# Detectron2 section ##############
 RUN pip install \ 
