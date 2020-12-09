@@ -30,9 +30,11 @@ then
 fi
 
 
-# Get the region defined in the current configuration (default to us-west-2 if none defined)
+# Get the region defined in the current configuration (default to us-east-1 if none defined)
 region=$(aws configure get region)
-region=${region:-us-east-2}
+region=${region:-us-east-1}
+
+echo "Working in region $region"
 
 if [ "$tag" == "" ]
 then
@@ -58,9 +60,9 @@ $(aws ecr get-login --region ${region} --no-include-email)
 
 if [ "$dockerfile" == "" ]
 then
-    docker build  -t ${image} .
+    docker build  -t ${image} . --build-arg REGION=${region}
 else
-    docker build -t ${image} . -f ${dockerfile}
+    docker build -t ${image} . -f ${dockerfile} --build-arg REGION=${region}
 fi
 
 docker tag ${image} ${fullname}

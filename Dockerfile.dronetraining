@@ -2,7 +2,9 @@
 
 # using Sagemaker PyTorch container as base image
 # from https://github.com/aws/sagemaker-pytorch-container
-FROM 763104351884.dkr.ecr.us-east-2.amazonaws.com/pytorch-training:1.5.1-gpu-py36-cu101-ubuntu16.04
+ARG REGION=us-east-2
+
+FROM 763104351884.dkr.ecr.${REGION}.amazonaws.com/pytorch-training:1.5.1-gpu-py36-cu101-ubuntu16.04
 LABEL author="vadimd@amazon.com"
 
 ############# Installing latest builds ############

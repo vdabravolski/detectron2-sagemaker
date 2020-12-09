@@ -2,7 +2,9 @@
 
 # using Sagemaker PyTorch container as base image
 # from https://github.com/aws/sagemaker-pytorch-serving-container/
-FROM 763104351884.dkr.ecr.eu-west-1.amazonaws.com/pytorch-inference:1.5.1-gpu-py36-cu101-ubuntu16.04
+ARG REGION=us-east-1
+
+FROM 763104351884.dkr.ecr.${REGION}.amazonaws.com/pytorch-inference:1.5.1-gpu-py36-cu101-ubuntu16.04
 
 ############# Installing latest builds ############
 RUN pip install --upgrade torch==1.6.0+cu101 torchvision==0.7.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
