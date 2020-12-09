@@ -1,3 +1,12 @@
 *checkpoints*
 *.pkl
 *.pyc
+
+# IDE configs
+.vscode
+.idea
+# Local config
+.pylintrc
+.env
+# Data
+cache
