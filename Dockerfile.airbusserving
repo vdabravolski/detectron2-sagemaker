@@ -1,0 +1,25 @@
+# Build an image of Detectron2 with Sagemaker Multi Model Server: https://github.com/awslabs/multi-model-server
+
+# using Sagemaker PyTorch container as base image
+# from https://github.com/aws/sagemaker-pytorch-serving-container/
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:1.5.1-gpu-py36-cu101-ubuntu16.04
+LABEL author="vadimd@amazon.com"
+
+############# Installing latest builds ############
+
+RUN pip install --upgrade --force-reinstall torch torchvision cython
+
+############# D2 section ##############
+# installing dependencies for D2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
+RUN pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
+RUN pip install 'git+https://github.com/facebookresearch/fvcore'
+
+ENV FORCE_CUDA="1"
+# Build D2 only for Turing architecture - G4 instance family
+ENV TORCH_CUDA_ARCH_LIST="Turing"
+
+# Build D2 from latest sources
+RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
+
+# Set a fixed model cache directory. Detectron2 requirement
+ENV FVCORE_CACHE="/tmp"

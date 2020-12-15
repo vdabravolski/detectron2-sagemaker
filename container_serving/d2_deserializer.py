@@ -14,6 +14,10 @@ def json_to_d2(predictions, device):
     
     pred_dict = json.loads(predictions)
     
+    height, width = pred_dict['image_size']
+    if not len(pred_dict.get("scores",0)):
+        return None, 0
+    
     for k, v in pred_dict.items():
         if k=="pred_boxes":
             boxes_to_tensor = torch.FloatTensor(v).to(device)
@@ -23,19 +27,18 @@ def json_to_d2(predictions, device):
         if k=="pred_classes":
             pred_dict[k] = torch.Tensor(v).to(device).to(torch.uint8)
         if k=="pred_masks_rle":
-            # Convert masks from pycoco RLE format to Detectron2 format
+#             Convert masks from pycoco RLE format to Detectron2 format
             pred_masks = np.stack([mask_util.decode(rle) for rle in v])
-    
+
     pred_dict["pred_masks"] = torch.Tensor(pred_masks).to(device).to(torch.bool)
     del pred_dict["pred_masks_rle"]
-    
     height, width = pred_dict['image_size']
     del pred_dict['image_size']
-
     
     inst = Instances((height, width,), **pred_dict)
+    counter = len(pred_dict.get("scores",0))
     
-    return {'instances':inst}
+    return {'instances':inst}, counter
 
 
 def d2_to_json(predictions):

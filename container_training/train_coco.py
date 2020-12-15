@@ -132,7 +132,6 @@ def _get_sm_world_size(sm_args):
     """
     
     number_of_processes = sm_args.num_gpus if sm_args.num_gpus > 0 else sm_args.num_cpus
-    number_of_machines = len(sm_args.hosts)
     world_size = number_of_processes * number_of_machines
     
     return number_of_processes, number_of_machines, world_size

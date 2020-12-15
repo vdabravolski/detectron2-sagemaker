@@ -1,0 +1,39 @@
+# Build an image of Detectron2 that can do distributing training on Amazon Sagemaker 
+
+# using Sagemaker PyTorch container as base image
+# from https://github.com/aws/sagemaker-pytorch-container
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:1.6.0-gpu-py36-cu110-ubuntu16.04
+LABEL author="vadimd@amazon.com"
+
+############# Detectron2 section ##############
+
+# installing dependecies for D2 https://github.com/facebookresearch/detectron2/blob/master/docker/Dockerfile
+RUN pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
+RUN pip install 'git+https://github.com/facebookresearch/fvcore'
+
+ENV FORCE_CUDA="1"
+# Build D2 only for Volta architecture - V100 chips (ml.p3 AWS instances)
+ENV TORCH_CUDA_ARCH_LIST="Volta" 
+
+# Build D2 from latest sources
+RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
+
+# Set a fixed model cache directory. Detectron2 requirement
+ENV FVCORE_CACHE="/tmp"
+# set location of training datasetm, Sagemaker containers copy all data from S3 to /opt/ml/input/data/{channels}
+ENV DETECTRON2_DATASETS="/opt/ml/input/data/training"
+# ENV DETECTRON2_DATASETS=/fsx/airbus-dataset
+############# SageMaker section ##############
+
+COPY container_training /opt/ml/code
+WORKDIR /opt/ml/code
+
+# cloning D2 to code dir as we need access to default congigs
+RUN git clone 'https://github.com/facebookresearch/detectron2.git'
+
+ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
+ENV SAGEMAKER_PROGRAM train_airbus.py
+
+WORKDIR /
+
+# ENTRYPOINT ["python", "/var/mnist.py"]
