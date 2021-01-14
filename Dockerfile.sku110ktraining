@@ -2,9 +2,9 @@
 
 # using Sagemaker PyTorch container as base image
 # from https://github.com/aws/sagemaker-pytorch-container
-ARG REGION=us-east-1
 
-FROM 763104351884.dkr.ecr.${REGION}.amazonaws.com/pytorch-training:1.6.0-gpu-py36-cu101-ubuntu16.04
+ARG REGION
+FROM 763104351884.dkr.ecr.$REGION.amazonaws.com/pytorch-training:1.6.0-gpu-py36-cu101-ubuntu16.04
 
 
 ############# Detectron2 pre-built binaries Pytorch default install ############

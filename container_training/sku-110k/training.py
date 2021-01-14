@@ -151,7 +151,7 @@ def _train_impl(args) -> None:
         raise err
     trainer.train()
 
-    # If in the master process: save config and run evaluation on test set
+    # If in the master process: save config and run COCO evaluation on test set
     if args.current_host == args.hosts[0]:
         with open(f"{cfg.OUTPUT_DIR}/config.json", "w") as fid:
             json.dump(cfg, fid, indent=2)
@@ -161,7 +161,7 @@ def _train_impl(args) -> None:
             evaluator = D2CocoEvaluator(
                 dataset_name=f"{dataset.name}_test",
                 tasks=("bbox",),
-                distributed=args.num_gpus > 1,
+                distributed=len(args.hosts)==1 and args.num_gpus > 1,
                 output_dir=f"{cfg.OUTPUT_DIR}/eval",
                 use_fast_impl=args.evaluation_type == "fast",
                 nb_max_preds=cfg.TEST.DETECTIONS_PER_IMAGE,
